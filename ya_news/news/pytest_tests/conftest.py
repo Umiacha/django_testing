@@ -6,6 +6,7 @@ from random import randint
 import pytest
 
 from news.models import News, Comment
+from news.forms import BAD_WORDS
 
 
 @pytest.fixture
@@ -70,3 +71,17 @@ def comments_for_post(news, author):
         )
         for comm_counter in range(COMMENTS_FROM_AUTHOR)
     ]
+
+@pytest.fixture
+def comment_form_data():
+    return {'text': 'Текст коммента'}
+
+@pytest.fixture
+def bad_comment_form_data():
+    """
+    Return list of form_data with bad words from news.forms.
+    """
+    bad_data = []
+    for word in BAD_WORDS:
+        bad_data.append({'text': 'Ты %s, и что ты мне сделаешь?' % word})
+    return bad_data
