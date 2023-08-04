@@ -6,7 +6,7 @@ from pytest_django.asserts import assertRedirects
 
 from django.urls import reverse
 
-# Объединить в один тесты маршрутов для удаления и редактирования комментариев
+# Объединить в один тесты маршрутов для удаления и редактирования комментариев.
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(

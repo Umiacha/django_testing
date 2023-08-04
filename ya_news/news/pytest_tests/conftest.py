@@ -8,6 +8,9 @@ import pytest
 from news.models import News, Comment
 from news.forms import BAD_WORDS
 
+# Добавить аннотации типов (касается всех файлов).
+# Добавить комментарии ошибок в тестах.
+# Добавить ids в parametrize для улучшения читаемости.
 
 @pytest.fixture
 def author(django_user_model):
@@ -45,7 +48,7 @@ def comment(author, news):
         news=news,
         author=author,
         text='Текст комментария',
-        created=datetime.now
+        created=datetime.now()
     )
 
 

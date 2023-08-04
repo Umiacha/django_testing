@@ -2,6 +2,9 @@ import pytest
 
 from django.urls import reverse
 
+# Вынести фикстуру django_db на уровень модуля.
+# Объединить test_news_count_on_mainpage и test_news_sorting (возможно, через последовательные вызовы).
+
 @pytest.mark.usefixtures('posts_for_pagination')
 def test_news_count_on_mainpage(client):
     HOME_PAGE_URL_NAME = 'news:home'

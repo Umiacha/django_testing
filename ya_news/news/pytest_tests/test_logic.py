@@ -10,6 +10,9 @@ from pytest_django.asserts import assertRedirects  # , assertFormError
 from news.models import Comment
 from news.forms import WARNING
 
+# Изменить assert в test_cancel_comment_with_bad_words на assertFormError (а то колхоз!).
+# Объединить тесты для удаления и редактирования комментариев (возможно, через вызовы в третьем тесте).
+
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     'user_agent, comments_posted',
@@ -61,7 +64,7 @@ def test_user_can_edit_comment(comment, news, comment_form_data, user_agent, can
         (pytest.lazy_fixture('admin_client'), False),
     ]
 )
-def test_user_can_edit_comment(comment, news, comment_form_data, user_agent, can_delete):
+def test_user_can_delete_comment(comment, news, comment_form_data, user_agent, can_delete):
     url = reverse('news:delete', args=(comment.id,))
     response = user_agent.post(url, data=comment_form_data)
     if can_delete:
