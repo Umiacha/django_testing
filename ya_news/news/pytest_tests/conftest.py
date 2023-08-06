@@ -19,8 +19,8 @@ from news.forms import BAD_WORDS
 # Done?
 # conftest: 1, docstrings for fixtures --> \/
 # test_routes: 1, 2, 3
-# test_content:
-# test_logic:
+# test_content: 1, 2, 3
+# test_logic: 1, 2, 3
 
 @pytest.fixture
 def author(django_user_model: User) -> User:

@@ -35,7 +35,8 @@ def test_comments_sorting(client: Client, news: News):
     [
         (pytest.lazy_fixture('client'), False, ['', '']),
         (pytest.lazy_fixture('author_client'), True, ['не ', 'не'])
-    ]
+    ],
+    ids=['anonim_user', 'authorized_user']
 )
 def test_page_contains_comment_form(news: News, user_agent: Client, expected_result: bool, msg_additions: List[str]):
     url: str = reverse('news:detail', args=(news.id,))
