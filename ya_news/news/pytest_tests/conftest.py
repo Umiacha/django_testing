@@ -18,8 +18,8 @@ from news.forms import BAD_WORDS
 
 # Done?
 # conftest: 1, docstrings for fixtures --> \/
-# test_routes: 1, 2, 3
-# test_content: 1, 2, 3
+# test_routes: 1, 2, 3, 4
+# test_content: 1, 2, 3, 4
 # test_logic: 1, 2, 3
 
 @pytest.fixture

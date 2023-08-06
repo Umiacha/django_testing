@@ -15,8 +15,6 @@ from news.forms import WARNING
 
 pytestmark = pytest.mark.django_db
 
-# Объединить тесты для удаления и редактирования комментариев (возможно, через вызовы в третьем тесте).
-
 @pytest.mark.parametrize(
     'user_agent, comments_posted, msg_additions',
     [
