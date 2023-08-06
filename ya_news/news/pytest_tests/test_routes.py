@@ -1,54 +1,55 @@
 from http import HTTPStatus
 
 import pytest
+from typing import Union
 
 from pytest_django.asserts import assertRedirects
 
 from django.urls import reverse
+from django.test import Client
+from django.http.response import HttpResponseBase
 
-# Объединить в один тесты маршрутов для удаления и редактирования комментариев.
-
-@pytest.mark.django_db
-@pytest.mark.parametrize(
-    'url_name',
-    ('news:home', 'users:login', 'users:logout', 'users:signup')
-)
-def test_page_availability_for_anonymous(client, url_name):
-    url = reverse(url_name)
-    response = client.get(url)
-    assert response.status_code == HTTPStatus.OK
+from news.models import News, Comment
 
 @pytest.mark.django_db
-def test_post_page_availability_for_anonymous(client, news):
-    url = reverse('news:detail', args=(news.id,))
-    response = client.get(url)
-    assert response.status_code == HTTPStatus.OK
+@pytest.mark.parametrize(
+    'url_name, page_args',
+    [
+        ('news:home', None),
+        ('users:login', None),
+        ('users:logout', None),
+        ('users:signup', None),
+        ('news:detail', pytest.lazy_fixture('news'))
+    ],
+    ids=['home', 'login', 'logout', 'signup', 'news_detail']
+)
+def test_page_availability_for_anonymous(client: Client, url_name: str, page_args: Union[None, News]):
+    if page_args is None:
+        url: str = reverse(url_name)
+    else:
+        url: str = reverse(url_name, args=(page_args.id,))
+    response: HttpResponseBase = client.get(url)
+    assert response.status_code == HTTPStatus.OK, f'Убедитесь, что страница {url_name} доступна для неаутентифицированного пользователя.'
 
 @pytest.mark.parametrize(
     'url_name',
-    ('news:delete', 'news:edit')
+    ('news:delete', 'news:edit'),
+    ids=['delete_comment', 'edit_comment']
 )
-def test_update_comment_availability_for_author(author_client, comment, url_name):
-    url = reverse(url_name, args=(comment.id,))
-    response = author_client.get(url)
-    assert response.status_code == HTTPStatus.OK
-
 @pytest.mark.parametrize(
-    'url_name',
-    ('news:delete', 'news:edit')
+    'user_agent, response_code',
+    [
+        (pytest.lazy_fixture('author_client'), HTTPStatus.OK),
+        (pytest.lazy_fixture('client'), HTTPStatus.FOUND),
+        (pytest.lazy_fixture('admin_client'), HTTPStatus.NOT_FOUND),
+    ],
+    ids=['author', 'anonimous_user', 'another_user']
 )
-def test_update_comment_anonim_redirect(client, comment, url_name, login_url_name='users:login'):
-    url = reverse(url_name, args=(comment.id,))
-    login_url = reverse(login_url_name)
-    response = client.get(url)
-    expected_url = f'{login_url}?next={url}'
-    assertRedirects(response, expected_url)
-
-@pytest.mark.parametrize(
-    'url_name',
-    ('news:delete', 'news:edit')
-)
-def test_update_comment_by_another_user(admin_client, comment, url_name):
-    url = reverse(url_name, args=(comment.id,))
-    response = admin_client.get(url)
-    assert response.status_code == HTTPStatus.NOT_FOUND
+def test_update_comment_by_user(url_name: str, user_agent: Client, response_code: Union[int, str], comment: Comment):
+    url: str = reverse(url_name, args=(comment.id,))
+    login_url: str = reverse('users:login')
+    expected_url_for_anonim: str = f'{login_url}?next={url}'
+    response: HttpResponseBase = user_agent.get(url)
+    if response.status_code == HTTPStatus.FOUND == response_code:
+        assertRedirects(response, expected_url_for_anonim, msg_prefix='Убедитесь, что при попытке редактирования или удаления комментария анонимный пользователь перенаправляется на страницу регистрации.')
+    assert response.status_code == response_code
