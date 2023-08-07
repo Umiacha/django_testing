@@ -1,7 +1,8 @@
 from datetime import datetime
 import json
 from random import randint
-from typing import List, Dict
+from pathlib import Path, PosixPath
+from typing import List, Dict, Iterable
 
 import pytest
 
@@ -11,16 +12,19 @@ from django.test import Client
 from news.models import News, Comment
 from news.forms import BAD_WORDS
 
-# 1) Добавить аннотации типов (касается всех файлов).
-# 2) Добавить комментарии ошибок в тестах.
-# 3) Добавить ids в parametrize для улучшения читаемости.
-# 4) Прогнать код через линтеры.
 
-# Done?
-# conftest: 1, docstrings for fixtures --> \/
-# test_routes: 1, 2, 3, 4
-# test_content: 1, 2, 3, 4
-# test_logic: 1, 2, 3
+def get_json_path() -> str:
+    """
+    Search news.json in news directory (and its subdirs).
+
+    Return cleaned full path of the first match.
+    """
+    origin_path: Iterable[PosixPath] = Path(
+        __file__
+    ).parent.parent.resolve().glob('**/news.json')
+    path: str = str(origin_path.__next__())
+    return path
+
 
 @pytest.fixture
 def author(django_user_model: User) -> User:
@@ -29,6 +33,7 @@ def author(django_user_model: User) -> User:
     """
     return django_user_model.objects.create(username='Автор')
 
+
 @pytest.fixture
 def author_client(author: User, client: Client) -> Client:
     """
@@ -36,6 +41,7 @@ def author_client(author: User, client: Client) -> Client:
     """
     client.force_login(author)
     return client
+
 
 @pytest.fixture
 def news() -> News:
@@ -47,6 +53,7 @@ def news() -> News:
         text='Text',
         date=datetime.today()
     )
+
 
 @pytest.fixture
 def comment(author: User, news: News) -> Comment:
@@ -68,7 +75,8 @@ def posts_for_pagination() -> List[News]:
     """
     Create News objects from JSON and return list of it
     """
-    with open('/home/umiacha/yp/dev/django_testing/ya_news/news/fixtures/news.json') as news_fixture:
+    json_path = get_json_path()
+    with open(json_path) as news_fixture:
         news_dict: List[Dict[str, Dict[str, str]]] = json.load(news_fixture)
     return [News.objects.create(**news['fields']) for news in news_dict]
 
@@ -78,7 +86,7 @@ def comments_for_post(news, author) -> List[Comment]:
     """
     Create and return as many Comment instances
     as specified in COMMENTS_FROM_AUTHOR.
-    
+
     The value of COMMENTS_FROM_AUTHOR is quite
     random, so you can change it to another.
     """
@@ -93,6 +101,7 @@ def comments_for_post(news, author) -> List[Comment]:
         for comm_counter in range(COMMENTS_FROM_AUTHOR)
     ]
 
+
 @pytest.fixture
 def comment_form_data() -> Dict[str, str]:
     """
@@ -100,6 +109,7 @@ def comment_form_data() -> Dict[str, str]:
     (or update existing).
     """
     return {'text': 'Текст коммента'}
+
 
 @pytest.fixture
 def bad_comment_form_data() -> List[Dict[str, str]]:

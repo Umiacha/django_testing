@@ -65,13 +65,14 @@ def test_update_comment_by_user(
     expected_url_for_anonim: str = f'{login_url}?next={url}'
     response: HttpResponseBase = user_agent.get(url)
     if response.status_code == HTTPStatus.FOUND == response_code:
+        REDIRECT_ERROR = (
+            'Убедитесь, что при попытке редактирования',
+            'или удаления комментария анонимный пользователь',
+            'перенаправляется на страницу регистрации.'
+        )
         assertRedirects(
             response,
             expected_url_for_anonim,
-            msg_prefix=(
-                'Убедитесь, что при попытке редактирования',
-                'или удаления комментария анонимный пользователь',
-                'перенаправляется на страницу регистрации.'
-            )
+            msg_prefix=''.join(REDIRECT_ERROR)
         )
     assert response.status_code == response_code

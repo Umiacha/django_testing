@@ -162,3 +162,6 @@ coverage.xml
 *.cover
 
 .vscode/
+
+#local using
+todo.txt

@@ -15,6 +15,7 @@ from news.forms import WARNING
 
 pytestmark = pytest.mark.django_db
 
+
 @pytest.mark.parametrize(
     'user_agent, comments_posted, msg_additions',
     [
@@ -23,18 +24,49 @@ pytestmark = pytest.mark.django_db
     ],
     ids=['anonim_user', 'authorized_user']
 )
-def test_user_can_create_comment(news: News, comment_form_data: Dict[str, str], user_agent: Client, comments_posted: int, msg_additions: List[str]):
+def test_user_can_create_comment(
+    news: News,
+    comment_form_data: Dict[str, str],
+    user_agent: Client,
+    comments_posted: int,
+    msg_additions: List[str]
+):
     url: str = reverse('news:detail', args=(news.id,))
-    response: str = user_agent.post(url, data=comment_form_data)
-    assert Comment.objects.count() == comments_posted, 'Убедитесь, что {}авторизованный пользователь {}может создать комментарий.'. format(*msg_additions)
+    user_agent.post(url, data=comment_form_data)
+    assert Comment.objects.count() == comments_posted, (
+        'Убедитесь, что {}авторизованный пользователь '
+        .format(msg_additions[0]),
+        '{}может создать комментарий.'
+        . format(msg_additions[1])
+    )
 
 
-def test_cancel_comment_with_bad_words(bad_comment_form_data: List[Dict[str, str]], news: News, author_client: Client):
+def test_cancel_comment_with_bad_words(
+    bad_comment_form_data: List[Dict[str, str]],
+    news: News,
+    author_client: Client
+):
     url: str = reverse('news:detail', args=(news.id,))
     for bad_data in bad_comment_form_data:
-        response: HttpResponseBase = author_client.post(url, data=bad_data)
-        assertFormError(response=response, form='form', field='text', errors=WARNING, msg_prefix='Убедитесь, что при попытке публикации комментария со словом из news.forms.BAD_WORDS форма возвращает ошибку.')
-    assert Comment.objects.count() == 0, 'Убедитесь, что комментарии со словами из news.forms.BAD_WORDS не публикуются.'
+        response: HttpResponseBase = author_client.post(
+            url, data=bad_data
+        )
+        FORM_ERROR = (
+            'Убедитесь, что при попытке публикации комментария ',
+            'со словом из news.forms.BAD_WORDS форма возвращает ошибку.'
+        )
+        assertFormError(
+            response=response,
+            form='form',
+            field='text',
+            errors=WARNING,
+            msg_prefix=''.join(FORM_ERROR)
+        )
+    assert Comment.objects.count() == 0, (
+        'Убедитесь, что комментарии со словами ',
+        'из news.forms.BAD_WORDS не публикуются.'
+    )
+
 
 @pytest.mark.parametrize(
     'url_name',
@@ -49,19 +81,55 @@ def test_cancel_comment_with_bad_words(bad_comment_form_data: List[Dict[str, str
     ],
     ids=['comment_author', 'another_user']
 )
-def test_user_can_update_comment(comment: Comment, news: News, comment_form_data: Dict[str, str], user_agent: Client, can_update: bool, url_name: str):
+def test_user_can_update_comment(
+    comment: Comment,
+    news: News,
+    comment_form_data: Dict[str, str],
+    user_agent: Client,
+    can_update: bool,
+    url_name: str
+):
     url: str = reverse(url_name, args=(comment.id,))
     response: HttpResponseBase = user_agent.post(url, data=comment_form_data)
     if can_update:
-        expected_url: str = reverse('news:detail', args=(news.id,)) + '#comments'
-        assertRedirects(response, expected_url, msg_prefix='Убедитесь, что при успешном обновлении состояния комментария авторизованный пользователь перенаправляется в раздел комментариев поста.')  # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        expected_url: str = reverse(
+            'news:detail', args=(news.id,)
+        ) + '#comments'
+        REDIRECT_ERROR = (
+            'Убедитесь, что при успешном обновлении комментария ',
+            'автор перенаправляется в раздел комментариев поста.'
+        )
+        assertRedirects(
+            response,
+            expected_url,
+            msg_prefix=''.join(REDIRECT_ERROR)
+        )
         if url_name == 'news:edit':
-            assert model_to_dict(Comment.objects.get(pk=comment.id))['text'] == comment_form_data['text'], 'Убедитесь, что текст комментария обновляется после редактирования.'
+            assert model_to_dict(
+                Comment.objects.get(pk=comment.id)
+            )['text'] == comment_form_data['text'], (
+                'Убедитесь, что текст комментария ',
+                'обновляется после редактирования.'
+            )
         else:
-            assert Comment.objects.count() == 0, 'Убедитесь, что комментарий удаляется при отправке авторизованным пользователем соответствующего запроса.'
+            assert Comment.objects.count() == 0, (
+                'Убедитесь, что комментарий удаляется при отправке ',
+                'авторизованным пользователем соответствующего запроса.'
+            )
     else:
-        assert response.status_code == HTTPStatus.NOT_FOUND, 'Убедитесь, что при попытке обновить состояние комментария другой пользователь получает ошибку 404.'
+        assert response.status_code == HTTPStatus.NOT_FOUND, (
+            'Убедитесь, что при попытке обновить комментарий ',
+            'другой пользователь получает ошибку 404.'
+        )
         if url_name == 'news:edit':
-            assert model_to_dict(Comment.objects.get(pk=comment.id))['text'] == comment.text, 'Убедитесь, что комментарий не изменяется, если запрос отправляет не автор комментария.'
+            assert model_to_dict(
+                Comment.objects.get(pk=comment.id)
+            )['text'] == comment.text, (
+                'Убедитесь, что комментарий не изменяется, ',
+                'если запрос отправляет не автор комментария.'
+            )
         else:
-            assert Comment.objects.count() == 1, 'Убедитесь, что при комментарий не удаляется по запросу не автора комментария.'
+            assert Comment.objects.count() == 1, (
+                'Убедитесь, что при комментарий не удаляется ',
+                'по запросу не автора комментария.'
+            )
