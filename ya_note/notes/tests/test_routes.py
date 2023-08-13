@@ -1,9 +1,8 @@
 from http import HTTPStatus
 
-from django.test import TestCase
+from django.test import TestCase, Client
 
 from django.urls import reverse
-from django.test import Client
 from django.contrib.auth import get_user_model
 
 from notes.models import Note
