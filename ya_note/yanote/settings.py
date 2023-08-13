@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-yipnj$#j!ajarq%k55z4kuf3x79)91h0h42o9!1ho(z=!%mt=#'
 
-DEBUG = False
+DEBUG = True  # При скачивании было True
 
 ALLOWED_HOSTS = ['*']
 
