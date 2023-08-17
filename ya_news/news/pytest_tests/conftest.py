@@ -1,16 +1,15 @@
 from datetime import datetime
-import json
-from random import randint
 from pathlib import Path, PosixPath
-from typing import List, Dict, Iterable
-
-import pytest
+from random import randint
+from typing import Dict, Iterable, List
+import json
 
 from django.contrib.auth.models import User
 from django.test import Client
+import pytest
 
-from news.models import News, Comment
 from news.forms import BAD_WORDS
+from news.models import Comment, News
 
 
 def get_json_path() -> str:

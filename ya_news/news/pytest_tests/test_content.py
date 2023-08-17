@@ -1,28 +1,38 @@
 from typing import List
 
-import pytest
-from _pytest.mark.structures import MarkDecorator
-
-from django.urls import reverse
-from django.test import Client
+from django.conf import settings
 from django.http.response import HttpResponseBase
+from django.test import Client
+from django.urls import reverse
+from _pytest.mark.structures import MarkDecorator
+import pytest
 
+from news.forms import CommentForm
 from news.models import News, Comment
+
+
+HOME_PAGE_URL_NAME: str = 'news:home'
 
 pytestmark: MarkDecorator = pytest.mark.django_db
 
 
 @pytest.mark.usefixtures('posts_for_pagination')
-def test_news_count_and_sorting_on_mainpage(client: Client):
-    HOME_PAGE_URL_NAME: str = 'news:home'
-    NEWS_ON_PAGE: int = 10
+def test_news_count_on_mainpage(client: Client):
     url: str = reverse(HOME_PAGE_URL_NAME)
     response: HttpResponseBase = client.get(url)
     news_list: List[News] = [news for news in response.context['object_list']]
-    assert len(news_list) == NEWS_ON_PAGE, (
+    assert len(news_list) == settings.NEWS_COUNT_ON_HOME_PAGE, (
         'Убедитесь, что количество отображаемых',
-        f'на главной странице постов не превышает {NEWS_ON_PAGE}.'
+        'на главной странице постов не превышает',
+        f'{settings.NEWS_COUNT_ON_HOME_PAGE}.'
     )
+
+
+@pytest.mark.usefixtures('posts_for_pagination')
+def test_news_sorting_on_mainpage(client: Client):
+    url: str = reverse(HOME_PAGE_URL_NAME)
+    response: HttpResponseBase = client.get(url)
+    news_list: List[News] = [news for news in response.context['object_list']]
     sorted_news: List[News] = sorted(
         news_list,
         key=lambda post: post.date,
@@ -66,7 +76,11 @@ def test_page_contains_comment_form(
 ):
     url: str = reverse('news:detail', args=(news.id,))
     response: HttpResponseBase = user_agent.get(url)
-    assert ('form' in response.context) == expected_result, (
+    context_dict = response.context
+    assert (
+        'form' in context_dict
+        and isinstance(context_dict['form'], CommentForm)
+    ) == expected_result, (
         'Убедитесь, что форма создания комментария {}отображается '
         .format(msg_additions[0]),
         'на странице новости для {}авторизованного пользователя'
