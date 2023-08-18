@@ -21,17 +21,17 @@ def test_user_can_create_comment(
     comment_form_data: Dict[str, str],
     author_client: Client,
 ):
-    COMMENTS_POSTED: int = 1
+    COMMENTS_POSTED: int = Comment.objects.filter(news=news).count()
     url: str = reverse('news:detail', args=(news.id,))
     author_client.post(url, data=comment_form_data)
-    assert Comment.objects.count() == COMMENTS_POSTED, (
+    assert Comment.objects.count() == COMMENTS_POSTED + 1, (
         'Убедитесь, что авторизованный пользователь ',
         'может создать комментарий.'
     )
     comment: Comment = Comment.objects.first()
     comment_form_data.update(
         {
-            'id': COMMENTS_POSTED,
+            'id': COMMENTS_POSTED + 1,
             'author': author.id,
             'news': news.id
         }
@@ -47,7 +47,7 @@ def test_anonim_cant_create_comment(
     comment_form_data: Dict[str, str],
     client: Client,
 ):
-    COMMENTS_POSTED: int = 0
+    COMMENTS_POSTED: int = Comment.objects.filter(news=news).count()
     url: str = reverse('news:detail', args=(news.id,))
     client.post(url, data=comment_form_data)
     assert Comment.objects.count() == COMMENTS_POSTED, (
@@ -61,7 +61,7 @@ def test_cancel_comment_with_bad_words(
     news: News,
     author_client: Client
 ):
-    COMMENTS_POSTED: int = 0
+    COMMENTS_POSTED: int = Comment.objects.filter(news=news).count()
     url: str = reverse('news:detail', args=(news.id,))
     for bad_data in bad_comment_form_data:
         response: HttpResponseBase = author_client.post(

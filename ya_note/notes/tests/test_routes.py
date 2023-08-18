@@ -1,16 +1,16 @@
 from http import HTTPStatus
 from typing import List
 
-from django.test import TestCase, Client
-
-from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractBaseUser
 from django.http.response import HttpResponseBase
+from django.test import Client, TestCase
+from django.urls import reverse
 
 from notes.models import Note
 
-User: AbstractBaseUser = get_user_model()
+
+User = get_user_model()
 
 
 class TestRoutes(TestCase):
@@ -33,27 +33,89 @@ class TestRoutes(TestCase):
             author=author
         )
 
-    def test_pages_availability(self):
-        url_names: List[str] = [
-            'notes:home',
-            'users:login',
-            'users:logout',
-            'users:signup'
+    def test_pages_availability_for_everyone(self):
+        urls_for_everyone: List[str] = [
+            reverse('notes:home'),
+            reverse('users:login'),
+            reverse('users:signup'),
+            reverse('users:logout')
         ]
-        for url_name in url_names:
-            with self.subTest(url_name=url_name):
-                url: str = reverse(url_name)
-                response: HttpResponseBase = self.anonim_client.get(url)
-                self.assertEqual(
-                    response.status_code,
-                    HTTPStatus.OK,
-                    ''.join(
-                        (f'Убедитесь, что страница {url_name} ',
-                         'доступна анонимному пользователю.')
+        urls_for_auth_users: List[str] = [
+            reverse('notes:list'),
+            reverse('notes:success'),
+            reverse('notes:add'),
+        ]
+        urls_for_author: List[str] = [
+            reverse('notes:detail', args=(self.note.slug,)),
+            reverse('notes:edit', args=(self.note.slug,)),
+            reverse('notes:delete', args=(self.note.slug,)),
+        ]
+        for user_agent, is_auth, is_author in (
+            (self.anonim_client, False, False),
+            (self.another_user_client, True, False),
+            (self.author_client, True, True)
+        ):
+            for url in urls_for_auth_users:
+                with self.subTest(url=url, client=user_agent):
+                    response: HttpResponseBase = user_agent.get(url)
+                    if is_auth:
+                        self.assertEqual(
+                            response.status_code,
+                            HTTPStatus.OK,
+                            ''.join(
+                                (f'Убедитесь, что страница {url} ',
+                                 'доступна авторизованному пользователю.')
+                            )
+                        )
+                    else:
+                        self.assertEqual(
+                            response.status_code,
+                            HTTPStatus.FOUND,
+                            ''.join(
+                                ('Убедитесь, что анонимный пользователь ',
+                                 f'перенаправляется со страницы {url}.')
+                            )
+                        )
+            for url in urls_for_author:
+                with self.subTest(url=url, client=user_agent):
+                    response: HttpResponseBase = user_agent.get(url)
+                    if is_auth and is_author:
+                        self.assertEqual(
+                            response.status_code,
+                            HTTPStatus.OK,
+                            ''.join(
+                                (f'Убедитесь, что страница {url} ',
+                                 'доступна автору заметки.')
+                            )
+                        )
+                    elif is_auth:
+                        self.assertEqual(
+                            response.status_code,
+                            HTTPStatus.NOT_FOUND,
+                            ''.join(
+                                (f'Убедитесь, что страница {url} ',
+                                 'недоступна не автору заметки.')
+                            )
+                        )
+                    else:
+                        self.assertEqual(
+                            response.status_code,
+                            HTTPStatus.FOUND,
+                            ''.join(
+                                ('Убедитесь, что анонимный пользователь ',
+                                 f'перенаправляется со страницы {url}.')
+                            )
+                        )
+            for url in urls_for_everyone:
+                with self.subTest(url=url, client=user_agent):
+                    response: HttpResponseBase = user_agent.get(url)
+                    self.assertEqual(
+                        response.status_code,
+                        HTTPStatus.OK,
+                        f'Убедитесь, что любому пользователю доступна {url}.'
                     )
-                )
 
-    def test_anoninum_cant_success_note_urls(self):
+    def test_anoninum_redirects_from_note_urls(self):
         url_names: List[str] = [
             ('notes:list', None),
             ('notes:add', None),
@@ -73,53 +135,5 @@ class TestRoutes(TestCase):
                     msg_prefix=''.join(
                         (f'Убедитесь, что {url_name} ',
                          'недоступна анонимному пользователя.')
-                    )
-                )
-
-    def test_auth_user_can_success_url_notes(self):
-        url_names: List[str] = [
-            'notes:list',
-            'notes:success',
-            'notes:add',
-        ]
-        for url_name in url_names:
-            with self.subTest(url_name=url_name):
-                url: str = reverse(url_name)
-                response: HttpResponseBase = self.another_user_client.get(url)
-                self.assertEqual(
-                    response.status_code,
-                    HTTPStatus.OK,
-                    ''.join(
-                        (f'Убедитесь, что страница {url_name} ',
-                         'доступна авторизованному пользователю.')
-                    )
-                )
-
-    def test_only_author_can_success_note(self):
-        url_names: List[str] = [
-            'notes:detail',
-            'notes:edit',
-            'notes:delete',
-        ]
-        NOTE_SLUG: str = self.note.slug
-        for url_name in url_names:
-            with self.subTest(url_name=url_name):
-                url: str = reverse(url_name, args=(NOTE_SLUG,))
-                author_response: HttpResponseBase = self.author_client.get(url)
-                self.assertEqual(
-                    author_response.status_code,
-                    HTTPStatus.OK,
-                    ''.join(
-                        (f'Убедитесь, что страница {url_name} ',
-                         'доступна автору заметки.')
-                    )
-                )
-                another_user_response = self.another_user_client.get(url)
-                self.assertEqual(
-                    another_user_response.status_code,
-                    HTTPStatus.NOT_FOUND,
-                    ''.join(
-                        (f'Убедитесь, что страница {url_name} ',
-                         'недоступна не автору заметки.')
                     )
                 )
