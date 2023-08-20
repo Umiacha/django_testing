@@ -43,6 +43,11 @@ def author_client(author: User, client: Client) -> Client:
 
 
 @pytest.fixture
+def anonim_client():
+    return Client()
+
+
+@pytest.fixture
 def news() -> News:
     """
     Generate and return post (News instance).

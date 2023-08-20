@@ -2,7 +2,6 @@ from http import HTTPStatus
 from typing import Dict, List
 
 from django.contrib.auth.models import User
-from django.forms.models import model_to_dict
 from django.http.response import HttpResponseBase
 from django.test import Client
 from django.urls import reverse
@@ -21,36 +20,39 @@ def test_user_can_create_comment(
     comment_form_data: Dict[str, str],
     author_client: Client,
 ):
-    COMMENTS_POSTED: int = Comment.objects.filter(news=news).count()
+    comments_posted: int = Comment.objects.filter(news=news).count()
     url: str = reverse('news:detail', args=(news.id,))
     author_client.post(url, data=comment_form_data)
-    assert Comment.objects.count() == COMMENTS_POSTED + 1, (
+    assert Comment.objects.count() == comments_posted + 1, (
         'Убедитесь, что авторизованный пользователь ',
         'может создать комментарий.'
     )
-    comment: Comment = Comment.objects.first()
-    comment_form_data.update(
-        {
-            'id': COMMENTS_POSTED + 1,
-            'author': author.id,
-            'news': news.id
-        }
+    created_comment: Comment = Comment.objects.get(
+        text=comment_form_data['text']
     )
-    assert model_to_dict(comment) == comment_form_data, (
-        'Убедитесь, что поля создаваемого комментария',
-        'корректно формируются.'
+    assert created_comment.id == comments_posted + 1, ''.join(
+        ('Убедитесь, что id комментария формируется правильно.')
+    )
+    assert created_comment.text == comment_form_data['text'], ''.join(
+        ('Убедитесь, что текст комментария формируется правильно.')
+    )
+    assert created_comment.author == author, ''.join(
+        ('Убедитесь, что поле author_id комментария формируется правильно.')
+    )
+    assert created_comment.news == news, ''.join(
+        ('Убедитесь, что news_id комментария формируется правильно.')
     )
 
 
 def test_anonim_cant_create_comment(
     news: News,
     comment_form_data: Dict[str, str],
-    client: Client,
+    anonim_client: Client,
 ):
-    COMMENTS_POSTED: int = Comment.objects.filter(news=news).count()
+    comments_posted: int = Comment.objects.filter(news=news).count()
     url: str = reverse('news:detail', args=(news.id,))
-    client.post(url, data=comment_form_data)
-    assert Comment.objects.count() == COMMENTS_POSTED, (
+    anonim_client.post(url, data=comment_form_data)
+    assert Comment.objects.count() == comments_posted, (
         'Убедитесь, что неавторизованный пользователь ',
         'не может создать комментарий.'
     )
@@ -61,7 +63,7 @@ def test_cancel_comment_with_bad_words(
     news: News,
     author_client: Client
 ):
-    COMMENTS_POSTED: int = Comment.objects.filter(news=news).count()
+    comments_posted: int = Comment.objects.filter(news=news).count()
     url: str = reverse('news:detail', args=(news.id,))
     for bad_data in bad_comment_form_data:
         response: HttpResponseBase = author_client.post(
@@ -78,80 +80,121 @@ def test_cancel_comment_with_bad_words(
             errors=WARNING,
             msg_prefix=''.join(FORM_ERROR)
         )
-    assert Comment.objects.count() == COMMENTS_POSTED, (
+    assert Comment.objects.count() == comments_posted, (
         'Убедитесь, что комментарии со словами ',
         'из news.forms.BAD_WORDS не публикуются.'
     )
 
 
-@pytest.mark.parametrize(
-    'url_name',
-    ('news:edit', 'news:delete'),
-    ids=['editing_comment', 'deleting_comment']
-)
-def test_author_can_update_comment(
+def test_author_can_delete_comment(
     comment: Comment,
     news: News,
     comment_form_data: Dict[str, str],
     author_client: Client,
-    url_name: str
 ):
-    url: str = reverse(url_name, args=(comment.id,))
+    url: str = reverse('news:delete', args=(comment.id,))
     response: HttpResponseBase = author_client.post(
         url, data=comment_form_data
     )
     expected_url: str = reverse(
         'news:detail', args=(news.id,)
     ) + '#comments'
-    REDIRECT_ERROR = (
+    DELETE_ERROR: str = (
         'Убедитесь, что при успешном обновлении комментария ',
         'автор перенаправляется в раздел комментариев поста.'
     )
     assertRedirects(
         response,
         expected_url,
-        msg_prefix=''.join(REDIRECT_ERROR)
+        msg_prefix=''.join(DELETE_ERROR)
     )
-    if url_name == 'news:edit':
-        assert model_to_dict(
-            Comment.objects.get(pk=comment.id)
-        )['text'] == comment_form_data['text'], (
-            'Убедитесь, что текст комментария ',
-            'обновляется после редактирования.'
-        )
-    else:
-        assert Comment.objects.count() == 0, (
-            'Убедитесь, что комментарий удаляется при отправке ',
-            'авторизованным пользователем соответствующего запроса.'
-        )
+    assert Comment.objects.count() == 0, (
+        'Убедитесь, что комментарий удаляется при отправке ',
+        'авторизованным пользователем соответствующего запроса.'
+    )
 
 
-@pytest.mark.parametrize(
-    'url_name',
-    ('news:edit', 'news:delete'),
-    ids=['editing_comment', 'deleting_comment']
-)
-def test_another_user_cant_update_comment(
+def test_author_can_edit_comment(
+    comment: Comment,
+    author_client: Client,
+    comment_form_data: Dict[str, str],
+    news: News
+):
+    url: str = reverse('news:edit', args=(comment.id,))
+    response: HttpResponseBase = author_client.post(
+        url, data=comment_form_data
+    )
+    expected_url: str = reverse(
+        'news:detail', args=(news.id,)
+    ) + '#comments'
+    EDIT_ERROR = (
+        'Убедитесь, что при успешном редактировании комментария ',
+        'автор перенаправляется в раздел комментариев поста.'
+    )
+    assertRedirects(
+        response,
+        expected_url,
+        msg_prefix=''.join(EDIT_ERROR)
+    )
+    edited_comment: Comment = Comment.objects.get(pk=comment.id)
+    assert edited_comment.id == comment.id, ''.join(
+        ('Убедитесь, что id комментария совпадает с таковым до обновления.')
+    )
+    assert edited_comment.text == comment_form_data['text'], ''.join(
+        ('Убедитесь, что текст комментария обновляется.')
+    )
+    assert edited_comment.author == comment.author, ''.join(
+        ('Убедитесь, что author_id комментария ',
+         'совпадает с таковым до обновления.')
+    )
+    assert edited_comment.news == comment.news, ''.join(
+        ('Убедитесь, что news_id комментария ',
+         'совпадает с таковым до обновления.')
+    )
+
+
+def test_another_user_cant_delete_comment(
     comment: Comment,
     comment_form_data: Dict[str, str],
-    url_name: str,
-    admin_client: Client
+    admin_client: Client,
+    news: News,
 ):
-    url: str = reverse(url_name, args=(comment.id,))
+    url: str = reverse('news:delete', args=(comment.id,))
     response: HttpResponseBase = admin_client.post(url, data=comment_form_data)
+    comments_posted: int = Comment.objects.filter(news=news).count()
     assert response.status_code == HTTPStatus.NOT_FOUND, (
         'Убедитесь, что при попытке обновить комментарий ',
         'другой пользователь получает ошибку 404.'
     )
-    if url_name == 'news:edit':
-        assert model_to_dict(
-            Comment.objects.get(pk=comment.id)
-        )['text'] == comment.text, (
-            'Убедитесь, что комментарий не изменяется, ',
-            'если запрос отправляет не автор комментария.'
-        )
-    else:
-        assert Comment.objects.count() == 1, (
-            'Убедитесь, что при комментарий не удаляется ',
-            'по запросу не автора комментария.'
-        )
+    assert Comment.objects.filter(news=news).count() == comments_posted, (
+        'Убедитесь, что комментарий не удаляется ',
+        'по запросу не автора комментария.'
+    )
+
+
+def test_another_user_cant_edit_comment(
+    comment: Comment,
+    admin_client: Client,
+    comment_form_data: Dict[str, str],
+):
+    url: str = reverse('news:edit', args=(comment.id,))
+    response: HttpResponseBase = admin_client.post(url, data=comment_form_data)
+    assert response.status_code == HTTPStatus.NOT_FOUND, (
+        'Убедитесь, что при попытке отредактировать комментарий ',
+        'другой пользователь получает ошибку 404.'
+    )
+    edited_comment: Comment = Comment.objects.get(pk=comment.id)
+    assert edited_comment.id == comment.id, ''.join(
+        ('Убедитесь, что id комментария совпадает с таковым до обновления.')
+    )
+    assert edited_comment.text == comment.text, ''.join(
+        ('Убедитесь, что текст комментария совпадает с таковым до обновления.')
+    )
+    assert edited_comment.author == comment.author, ''.join(
+        ('Убедитесь, что author_id комментария ',
+         'совпадает с таковым до обновления.')
+    )
+    assert edited_comment.news == comment.news, ''.join(
+        ('Убедитесь, что news_id комментария ',
+         'совпадает с таковым до обновления.')
+    )

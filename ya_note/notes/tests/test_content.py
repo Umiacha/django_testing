@@ -1,7 +1,6 @@
 from typing import List, Tuple, Union
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AbstractBaseUser
+from django.contrib.auth import get_user, get_user_model
 from django.db.models.query import QuerySet
 from django.http.response import HttpResponseBase
 from django.test import Client, TestCase
@@ -17,10 +16,10 @@ User = get_user_model()
 class TestContent(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.author: AbstractBaseUser = User.objects.create(
+        cls.author: User = User.objects.create(
             username='Автор'
         )
-        cls.another_user: AbstractBaseUser = User.objects.create(
+        cls.another_user: User = User.objects.create(
             username='Пользователь'
         )
         cls.author_client: Client = Client()
@@ -52,12 +51,18 @@ class TestContent(TestCase):
             ):
                 response: HttpResponseBase = user_agent.get(url)
                 notes_list: QuerySet[Note] = response.context['object_list']
-                expected_result = Note.objects.first().author == user
-                self.assertEqual(
-                    self.author_note in notes_list,
-                    expected_result,
-                    error_msg
-                )
+                if get_user(user_agent) == self.author:
+                    self.assertIn(
+                        self.author_note,
+                        notes_list,
+                        error_msg
+                    )
+                else:
+                    self.assertNotIn(
+                        self.author_note,
+                        notes_list,
+                        error_msg
+                    )
 
     def test_note_form_on_page(self):
         url_attrs: List[str, Union(Tuple[str])] = [

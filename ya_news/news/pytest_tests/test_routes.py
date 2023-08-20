@@ -1,5 +1,4 @@
 from http import HTTPStatus
-from typing import Union
 
 from django.http.response import HttpResponseBase
 from django.test import Client
@@ -10,57 +9,53 @@ from pytest_django.asserts import assertRedirects
 from news.models import Comment
 
 
-@pytest.mark.usefixtures('news')
+@pytest.mark.usefixtures('news', 'comment')
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    'url_name',
+    'url, anonim_code, auth_code, author_code',
     [
-        reverse('news:home'),
-        reverse('users:login'),
-        reverse('users:logout'),
-        reverse('users:signup'),
-        reverse('news:detail', args=(1,)),
+        (reverse('news:home'),
+         HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+        (reverse('users:login'),
+         HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+        (reverse('users:logout'),
+         HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+        (reverse('users:signup'),
+         HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+        (reverse('news:detail', args=(1,)),
+         HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+        (reverse('news:edit', args=(1,)),
+         HTTPStatus.FOUND, HTTPStatus.NOT_FOUND, HTTPStatus.OK),
+        (reverse('news:delete', args=(1,)),
+         HTTPStatus.FOUND, HTTPStatus.NOT_FOUND, HTTPStatus.OK),
     ],
-    ids=['home', 'login', 'logout', 'signup', 'news_detail']
+    ids=['home', 'login', 'logout', 'signup', 'news_detail',
+         'news_edit', 'news_delete']
 )
-def test_page_availability_for_anonymous(
-    client: Client,
-    url_name: str
+def test_pages_availability(
+    url: str,
+    auth_code: int,
+    author_code: int,
+    anonim_code: int,
+    admin_client: Client,
+    author_client: Client,
+    anonim_client: Client,
 ):
-    """
-    'news:detail' test work with page of 'news' fixture.
-    Fixture's page id specified explicitly in parameters because of
-    test's parametrizing happens at collection time.
-    """
-    response: HttpResponseBase = client.get(url_name)
-    assert response.status_code == HTTPStatus.OK, (
-        f'Убедитесь, что страница {url_name} доступна',
-        'для неаутентифицированного пользователя.'
+    anonim_response: HttpResponseBase = anonim_client.get(url)
+    assert anonim_response.status_code == anonim_code, ''.join(
+        ('Убедитесь, что анонимный пользователь при переходе ',
+         f'на {url} получает код ответа {anonim_code}.')
     )
-
-
-@pytest.mark.parametrize(
-    'url_name',
-    ('news:delete', 'news:edit'),
-    ids=['delete_comment', 'edit_comment']
-)
-@pytest.mark.parametrize(
-    'user_agent, response_code',
-    [
-        (pytest.lazy_fixture('author_client'), HTTPStatus.OK),
-        (pytest.lazy_fixture('admin_client'), HTTPStatus.NOT_FOUND),
-    ],
-    ids=['author', 'another_user']
-)
-def test_update_comment_by_user(
-    url_name: str,
-    user_agent: Client,
-    response_code: Union[int, str],
-    comment: Comment
-):
-    url: str = reverse(url_name, args=(comment.id,))
-    response: HttpResponseBase = user_agent.get(url)
-    assert response.status_code == response_code
+    auth_response: HttpResponseBase = admin_client.get(url)
+    assert auth_response.status_code == auth_code, ''.join(
+        ('Убедитесь, что авторизованный пользователь при переходе ',
+         f'на {url} получает код ответа {auth_code}.')
+    )
+    author_response: HttpResponseBase = author_client.get(url)
+    assert author_response.status_code == author_code, ''.join(
+        ('Убедитесь, что пользователь-автор при переходе ',
+         f'на {url} получает код ответа {author_code}.')
+    )
 
 
 @pytest.mark.parametrize(
@@ -71,7 +66,7 @@ def test_update_comment_by_user(
 def test_anonim_update_comment_redirect(
     url_name: str,
     comment: Comment,
-    client: Client
+    anonim_client: Client
 ):
     REDIRECT_ERROR: str = (
         'Убедитесь, что при попытке редактирования',
@@ -81,7 +76,7 @@ def test_anonim_update_comment_redirect(
     url: str = reverse(url_name, args=(comment.id,))
     login_url: str = reverse('users:login')
     expected_url_for_anonim: str = f'{login_url}?next={url}'
-    response: HttpResponseBase = client.get(url)
+    response: HttpResponseBase = anonim_client.get(url)
     assertRedirects(
         response,
         expected_url_for_anonim,

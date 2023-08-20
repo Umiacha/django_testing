@@ -17,10 +17,10 @@ pytestmark: MarkDecorator = pytest.mark.django_db
 
 
 @pytest.mark.usefixtures('posts_for_pagination')
-def test_news_count_on_mainpage(client: Client):
+def test_news_count_on_mainpage(anonim_client: Client):
     url: str = reverse(HOME_PAGE_URL_NAME)
-    response: HttpResponseBase = client.get(url)
-    news_list: List[News] = [news for news in response.context['object_list']]
+    response: HttpResponseBase = anonim_client.get(url)
+    news_list = response.context['object_list']
     assert len(news_list) == settings.NEWS_COUNT_ON_HOME_PAGE, (
         'Убедитесь, что количество отображаемых',
         'на главной странице постов не превышает',
@@ -29,9 +29,9 @@ def test_news_count_on_mainpage(client: Client):
 
 
 @pytest.mark.usefixtures('posts_for_pagination')
-def test_news_sorting_on_mainpage(client: Client):
+def test_news_sorting_on_mainpage(anonim_client: Client):
     url: str = reverse(HOME_PAGE_URL_NAME)
-    response: HttpResponseBase = client.get(url)
+    response: HttpResponseBase = anonim_client.get(url)
     news_list: List[News] = [news for news in response.context['object_list']]
     sorted_news: List[News] = sorted(
         news_list,
@@ -45,9 +45,9 @@ def test_news_sorting_on_mainpage(client: Client):
 
 
 @pytest.mark.usefixtures('comments_for_post')
-def test_comments_sorting(client: Client, news: News):
+def test_comments_sorting(anonim_client: Client, news: News):
     url: str = reverse('news:detail', args=(news.id,))
-    response: HttpResponseBase = client.get(url)
+    response: HttpResponseBase = anonim_client.get(url)
     comments_list: List[Comment] = [
         comment for comment in response.context['news'].comment_set.all()
     ]
@@ -63,7 +63,7 @@ def test_comments_sorting(client: Client, news: News):
 @pytest.mark.parametrize(
     'user_agent, expected_result, msg_additions',
     [
-        (pytest.lazy_fixture('client'), False, ['', '']),
+        (pytest.lazy_fixture('anonim_client'), False, ['', '']),
         (pytest.lazy_fixture('author_client'), True, ['не ', 'не'])
     ],
     ids=['anonim_user', 'authorized_user']
@@ -76,10 +76,10 @@ def test_page_contains_comment_form(
 ):
     url: str = reverse('news:detail', args=(news.id,))
     response: HttpResponseBase = user_agent.get(url)
-    context_dict = response.context
+    context = response.context
     assert (
-        'form' in context_dict
-        and isinstance(context_dict['form'], CommentForm)
+        'form' in context
+        and isinstance(context['form'], CommentForm)
     ) == expected_result, (
         'Убедитесь, что форма создания комментария {}отображается '
         .format(msg_additions[0]),
