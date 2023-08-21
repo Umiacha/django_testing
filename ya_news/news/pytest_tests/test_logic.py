@@ -24,23 +24,24 @@ def test_user_can_create_comment(
     url: str = reverse('news:detail', args=(news.id,))
     author_client.post(url, data=comment_form_data)
     assert Comment.objects.count() == comments_posted + 1, (
-        'Убедитесь, что авторизованный пользователь ',
+        'Убедитесь, что авторизованный пользователь '
         'может создать комментарий.'
     )
-    created_comment: Comment = Comment.objects.get(
-        text=comment_form_data['text']
+    created_comment: Comment = Comment.objects.filter(
+        author=author,
+        news=news
+    ).order_by('created').last()
+    assert created_comment.id == comments_posted + 1, (
+        'Убедитесь, что id комментария формируется правильно.'
     )
-    assert created_comment.id == comments_posted + 1, ''.join(
-        ('Убедитесь, что id комментария формируется правильно.')
+    assert created_comment.text == comment_form_data['text'], (
+        'Убедитесь, что текст комментария формируется правильно.'
     )
-    assert created_comment.text == comment_form_data['text'], ''.join(
-        ('Убедитесь, что текст комментария формируется правильно.')
+    assert created_comment.author == author, (
+        'Убедитесь, что поле author_id комментария формируется правильно.'
     )
-    assert created_comment.author == author, ''.join(
-        ('Убедитесь, что поле author_id комментария формируется правильно.')
-    )
-    assert created_comment.news == news, ''.join(
-        ('Убедитесь, что news_id комментария формируется правильно.')
+    assert created_comment.news == news, (
+        'Убедитесь, что news_id комментария формируется правильно.'
     )
 
 
@@ -53,7 +54,7 @@ def test_anonim_cant_create_comment(
     url: str = reverse('news:detail', args=(news.id,))
     anonim_client.post(url, data=comment_form_data)
     assert Comment.objects.count() == comments_posted, (
-        'Убедитесь, что неавторизованный пользователь ',
+        'Убедитесь, что неавторизованный пользователь '
         'не может создать комментарий.'
     )
 
@@ -69,19 +70,18 @@ def test_cancel_comment_with_bad_words(
         response: HttpResponseBase = author_client.post(
             url, data=bad_data
         )
-        FORM_ERROR = (
-            'Убедитесь, что при попытке публикации комментария ',
-            'со словом из news.forms.BAD_WORDS форма возвращает ошибку.'
-        )
         assertFormError(
             response=response,
             form='form',
             field='text',
             errors=WARNING,
-            msg_prefix=''.join(FORM_ERROR)
+            msg_prefix=(
+                'Убедитесь, что при попытке публикации комментария '
+                'со словом из news.forms.BAD_WORDS форма возвращает ошибку.'
+            )
         )
     assert Comment.objects.count() == comments_posted, (
-        'Убедитесь, что комментарии со словами ',
+        'Убедитесь, что комментарии со словами '
         'из news.forms.BAD_WORDS не публикуются.'
     )
 
@@ -99,17 +99,16 @@ def test_author_can_delete_comment(
     expected_url: str = reverse(
         'news:detail', args=(news.id,)
     ) + '#comments'
-    DELETE_ERROR: str = (
-        'Убедитесь, что при успешном обновлении комментария ',
-        'автор перенаправляется в раздел комментариев поста.'
-    )
     assertRedirects(
         response,
         expected_url,
-        msg_prefix=''.join(DELETE_ERROR)
+        msg_prefix=(
+            'Убедитесь, что при успешном обновлении комментария '
+            'автор перенаправляется в раздел комментариев поста.'
+        )
     )
-    assert Comment.objects.count() == 0, (
-        'Убедитесь, что комментарий удаляется при отправке ',
+    assert comment not in Comment.objects.all(), (
+        'Убедитесь, что комментарий удаляется при отправке '
         'авторизованным пользователем соответствующего запроса.'
     )
 
@@ -127,29 +126,28 @@ def test_author_can_edit_comment(
     expected_url: str = reverse(
         'news:detail', args=(news.id,)
     ) + '#comments'
-    EDIT_ERROR = (
-        'Убедитесь, что при успешном редактировании комментария ',
-        'автор перенаправляется в раздел комментариев поста.'
-    )
     assertRedirects(
         response,
         expected_url,
-        msg_prefix=''.join(EDIT_ERROR)
+        msg_prefix=(
+            'Убедитесь, что при успешном редактировании комментария '
+            'автор перенаправляется в раздел комментариев поста.'
+        )
     )
     edited_comment: Comment = Comment.objects.get(pk=comment.id)
-    assert edited_comment.id == comment.id, ''.join(
-        ('Убедитесь, что id комментария совпадает с таковым до обновления.')
+    assert edited_comment.id == comment.id, (
+        'Убедитесь, что id комментария совпадает с таковым до обновления.'
     )
-    assert edited_comment.text == comment_form_data['text'], ''.join(
-        ('Убедитесь, что текст комментария обновляется.')
+    assert edited_comment.text == comment_form_data['text'], (
+        'Убедитесь, что текст комментария обновляется.'
     )
-    assert edited_comment.author == comment.author, ''.join(
-        ('Убедитесь, что author_id комментария ',
-         'совпадает с таковым до обновления.')
+    assert edited_comment.author == comment.author, (
+        'Убедитесь, что author_id комментария '
+        'совпадает с таковым до обновления.'
     )
-    assert edited_comment.news == comment.news, ''.join(
-        ('Убедитесь, что news_id комментария ',
-         'совпадает с таковым до обновления.')
+    assert edited_comment.news == comment.news, (
+        'Убедитесь, что news_id комментария '
+        'совпадает с таковым до обновления.'
     )
 
 
@@ -161,13 +159,12 @@ def test_another_user_cant_delete_comment(
 ):
     url: str = reverse('news:delete', args=(comment.id,))
     response: HttpResponseBase = admin_client.post(url, data=comment_form_data)
-    comments_posted: int = Comment.objects.filter(news=news).count()
     assert response.status_code == HTTPStatus.NOT_FOUND, (
-        'Убедитесь, что при попытке обновить комментарий ',
+        'Убедитесь, что при попытке обновить комментарий '
         'другой пользователь получает ошибку 404.'
     )
-    assert Comment.objects.filter(news=news).count() == comments_posted, (
-        'Убедитесь, что комментарий не удаляется ',
+    assert comment in Comment.objects.all(), (
+        'Убедитесь, что комментарий не удаляется '
         'по запросу не автора комментария.'
     )
 
@@ -180,21 +177,21 @@ def test_another_user_cant_edit_comment(
     url: str = reverse('news:edit', args=(comment.id,))
     response: HttpResponseBase = admin_client.post(url, data=comment_form_data)
     assert response.status_code == HTTPStatus.NOT_FOUND, (
-        'Убедитесь, что при попытке отредактировать комментарий ',
+        'Убедитесь, что при попытке отредактировать комментарий '
         'другой пользователь получает ошибку 404.'
     )
     edited_comment: Comment = Comment.objects.get(pk=comment.id)
-    assert edited_comment.id == comment.id, ''.join(
-        ('Убедитесь, что id комментария совпадает с таковым до обновления.')
+    assert edited_comment.id == comment.id, (
+        'Убедитесь, что id комментария совпадает с таковым до обновления.'
     )
-    assert edited_comment.text == comment.text, ''.join(
-        ('Убедитесь, что текст комментария совпадает с таковым до обновления.')
+    assert edited_comment.text == comment.text, (
+        'Убедитесь, что текст комментария совпадает с таковым до обновления.'
     )
-    assert edited_comment.author == comment.author, ''.join(
-        ('Убедитесь, что author_id комментария ',
-         'совпадает с таковым до обновления.')
+    assert edited_comment.author == comment.author, (
+        'Убедитесь, что author_id комментария '
+        'совпадает с таковым до обновления.'
     )
-    assert edited_comment.news == comment.news, ''.join(
-        ('Убедитесь, что news_id комментария ',
-         'совпадает с таковым до обновления.')
+    assert edited_comment.news == comment.news, (
+        'Убедитесь, что news_id комментария '
+        'совпадает с таковым до обновления.'
     )

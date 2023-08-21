@@ -22,8 +22,8 @@ def test_news_count_on_mainpage(anonim_client: Client):
     response: HttpResponseBase = anonim_client.get(url)
     news_list = response.context['object_list']
     assert len(news_list) == settings.NEWS_COUNT_ON_HOME_PAGE, (
-        'Убедитесь, что количество отображаемых',
-        'на главной странице постов не превышает',
+        'Убедитесь, что количество отображаемых'
+        'на главной странице постов не превышает'
         f'{settings.NEWS_COUNT_ON_HOME_PAGE}.'
     )
 
@@ -32,32 +32,38 @@ def test_news_count_on_mainpage(anonim_client: Client):
 def test_news_sorting_on_mainpage(anonim_client: Client):
     url: str = reverse(HOME_PAGE_URL_NAME)
     response: HttpResponseBase = anonim_client.get(url)
-    news_list: List[News] = [news for news in response.context['object_list']]
+    news_list = response.context['object_list']
     sorted_news: List[News] = sorted(
         news_list,
         key=lambda post: post.date,
         reverse=True
     )
-    assert sorted_news == news_list, (
-        'Убедитесь, что посты на главной странице',
-        'выводятся в порядке от новых к старым.'
-    )
+    try:
+        for result, expected in zip(news_list, sorted_news):
+            assert result == expected
+    except AssertionError:
+        raise AssertionError(
+            ('Убедитесь, что посты на главной странице '
+             'выводятся в порядке от новых к старым.')
+        )
 
 
 @pytest.mark.usefixtures('comments_for_post')
 def test_comments_sorting(anonim_client: Client, news: News):
     url: str = reverse('news:detail', args=(news.id,))
     response: HttpResponseBase = anonim_client.get(url)
-    comments_list: List[Comment] = [
-        comment for comment in response.context['news'].comment_set.all()
-    ]
+    comments_list = response.context['news'].comment_set.all()
     sorted_comments: List[Comment] = sorted(
         comments_list, key=lambda x: x.created
     )
-    assert sorted_comments == comments_list, (
-        'Убедитесь, что комментарии на странице новости',
-        'отсортированы от старых к новым.'
-    )
+    try:
+        for result, expected in zip(comments_list, sorted_comments):
+            assert result == expected
+    except AssertionError:
+        raise AssertionError(
+            ('Убедитесь, что комментарии на странице новости '
+             'отсортированы от старых к новым.')
+        )
 
 
 @pytest.mark.parametrize(
@@ -77,6 +83,15 @@ def test_page_contains_comment_form(
     url: str = reverse('news:detail', args=(news.id,))
     response: HttpResponseBase = user_agent.get(url)
     context = response.context
+    '''
+    Но почему "избыточно"? Оператор and проходит логическое выражение
+    слева-направо и возвращает первое ложное высказывание, либо
+    (если все True) -- последнее высказывание.
+    Как раз таки благодаря "ленивости" and при
+    тестировании запроса анонимного пользователя мы не доходим до
+    isinstance и не получаем KeyError, а при проверке пользователя до
+    isinstance мы доходить (и проходить его) должны. Или я неправильно понял?
+    '''
     assert (
         'form' in context
         and isinstance(context['form'], CommentForm)

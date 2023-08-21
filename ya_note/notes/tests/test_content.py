@@ -1,6 +1,6 @@
 from typing import List, Tuple, Union
 
-from django.contrib.auth import get_user, get_user_model
+from django.contrib.auth import get_user_model
 from django.db.models.query import QuerySet
 from django.http.response import HttpResponseBase
 from django.test import Client, TestCase
@@ -34,15 +34,15 @@ class TestContent(TestCase):
 
     def test_note_in_context(self):
         url: str = reverse('notes:list')
-        for user_agent, user, error_msg in [
+        for user_agent, user, error_msg, note_assert in [
             (self.author_client, self.author,
-             'Убедитесь, что заметка автора отображается ему на notes:list.'),
+             'Убедитесь, что заметка автора отображается ему на notes:list.',
+             self.assertIn),
             (self.another_user_client,
              self.another_user,
-             ''.join(
-                 ('Убедитесь, что заметка другого пользователя ',
-                  'не отображается другим пользователям на notes:list.')
-             ))
+             ('Убедитесь, что заметка другого пользователя '
+              'не отображается другим пользователям на notes:list.'),
+             self.assertNotIn)
         ]:
             with self.subTest(
                 user_agent=user_agent,
@@ -51,18 +51,11 @@ class TestContent(TestCase):
             ):
                 response: HttpResponseBase = user_agent.get(url)
                 notes_list: QuerySet[Note] = response.context['object_list']
-                if get_user(user_agent) == self.author:
-                    self.assertIn(
-                        self.author_note,
-                        notes_list,
-                        error_msg
-                    )
-                else:
-                    self.assertNotIn(
-                        self.author_note,
-                        notes_list,
-                        error_msg
-                    )
+                note_assert(
+                    self.author_note,
+                    notes_list,
+                    error_msg
+                )
 
     def test_note_form_on_page(self):
         url_attrs: List[str, Union(Tuple[str])] = [
@@ -77,8 +70,6 @@ class TestContent(TestCase):
                 self.assertIsInstance(
                     response_form,
                     NoteForm,
-                    ''.join(
-                        ('Убедитесь, что форма для создания заметки ',
-                         f'отображается на {url_name}.')
-                    )
+                    ('Убедитесь, что форма для создания заметки '
+                     f'отображается на {url_name}.')
                 )

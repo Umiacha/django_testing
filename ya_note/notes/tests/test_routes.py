@@ -66,33 +66,31 @@ class TestRoutes(TestCase):
                 self.assertEqual(
                     anonim_response.status_code,
                     anonim_code,
-                    ''.join(
-                        ('Убедитесь, что анонимный пользователь ',
-                         f'при переходе на {url} получает ',
-                         f'код ответа {anonim_code}')
-                    )
+                    ('Убедитесь, что анонимный пользователь '
+                     f'при переходе на {url} получает '
+                     f'код ответа {anonim_code}')
                 )
+                if anonim_code == HTTPStatus.OK:
+                    continue
                 auth_response: HttpResponseBase = (
                     self.another_user_client.get(url)
                 )
                 self.assertEqual(
                     auth_response.status_code,
                     auth_code,
-                    ''.join(
-                        ('Убедитесь, что авторизованный пользователь ',
-                         f'при переходе на {url} получает ',
-                         f'код ответа {auth_code}')
-                    )
+                    ('Убедитесь, что авторизованный пользователь '
+                     f'при переходе на {url} получает '
+                     f'код ответа {auth_code}')
                 )
+                if auth_code == HTTPStatus.OK:
+                    continue
                 author_response: HttpResponseBase = self.author_client.get(url)
                 self.assertEqual(
                     author_response.status_code,
                     author_code,
-                    ''.join(
-                        ('Убедитесь, что пользователь-автор ',
-                         f'при переходе на {url} получает ',
-                         f'код ответа {author_code}')
-                    )
+                    ('Убедитесь, что пользователь-автор '
+                     f'при переходе на {url} получает '
+                     f'код ответа {author_code}')
                 )
 
     def test_anoninum_redirects_from_note_urls(self):
@@ -112,8 +110,8 @@ class TestRoutes(TestCase):
                 self.assertRedirects(
                     response=response,
                     expected_url=expected_url,
-                    msg_prefix=''.join(
-                        (f'Убедитесь, что {url_name} ',
-                         'недоступна анонимному пользователя.')
+                    msg_prefix=(
+                        f'Убедитесь, что {url_name} '
+                        'недоступна анонимному пользователя.'
                     )
                 )

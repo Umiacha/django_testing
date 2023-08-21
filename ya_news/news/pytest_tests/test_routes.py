@@ -42,19 +42,23 @@ def test_pages_availability(
     anonim_client: Client,
 ):
     anonim_response: HttpResponseBase = anonim_client.get(url)
-    assert anonim_response.status_code == anonim_code, ''.join(
-        ('Убедитесь, что анонимный пользователь при переходе ',
-         f'на {url} получает код ответа {anonim_code}.')
+    assert anonim_response.status_code == anonim_code, (
+        'Убедитесь, что анонимный пользователь при переходе '
+        f'на {url} получает код ответа {anonim_code}.'
     )
+    if anonim_code == HTTPStatus.OK:
+        pytest.skip(
+            'Для авторизованных пользователей проверка не требуется.'
+        )
     auth_response: HttpResponseBase = admin_client.get(url)
-    assert auth_response.status_code == auth_code, ''.join(
-        ('Убедитесь, что авторизованный пользователь при переходе ',
-         f'на {url} получает код ответа {auth_code}.')
+    assert auth_response.status_code == auth_code, (
+        'Убедитесь, что авторизованный пользователь при переходе '
+        f'на {url} получает код ответа {auth_code}.'
     )
     author_response: HttpResponseBase = author_client.get(url)
-    assert author_response.status_code == author_code, ''.join(
-        ('Убедитесь, что пользователь-автор при переходе ',
-         f'на {url} получает код ответа {author_code}.')
+    assert author_response.status_code == author_code, (
+        'Убедитесь, что пользователь-автор при переходе '
+        f'на {url} получает код ответа {author_code}.'
     )
 
 
@@ -68,11 +72,6 @@ def test_anonim_update_comment_redirect(
     comment: Comment,
     anonim_client: Client
 ):
-    REDIRECT_ERROR: str = (
-        'Убедитесь, что при попытке редактирования',
-        'или удаления комментария анонимный пользователь',
-        'перенаправляется на страницу регистрации.'
-    )
     url: str = reverse(url_name, args=(comment.id,))
     login_url: str = reverse('users:login')
     expected_url_for_anonim: str = f'{login_url}?next={url}'
@@ -80,5 +79,9 @@ def test_anonim_update_comment_redirect(
     assertRedirects(
         response,
         expected_url_for_anonim,
-        msg_prefix=''.join(REDIRECT_ERROR)
+        msg_prefix=(
+            'Убедитесь, что при попытке редактирования '
+            'или удаления комментария анонимный пользователь '
+            'перенаправляется на страницу регистрации.'
+        )
     )

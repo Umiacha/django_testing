@@ -60,11 +60,11 @@ class TestLogic(TestCase):
             url, data=self.NOTE_DATA
         )
         self.assertRedirects(
-            author_response,
-            reverse('notes:success'),
-            msg_prefix=''.join(
-                ('Убедитесь, что после создания заметки ',
-                 'автор перенаправляется на notes:success.')
+            response=author_response,
+            expected_url=reverse('notes:success'),
+            msg_prefix=(
+                'Убедитесь, что после создания заметки '
+                'автор перенаправляется на notes:success.'
             )
         )
         self.assertEqual(
@@ -72,16 +72,26 @@ class TestLogic(TestCase):
             notes_in_db + 1,
             'Убедитесь, что созданная пользователем заметка сохраняется.'
         )
+        created_note: Note = Note.objects.get(
+            slug=slugify(self.NOTE_DATA['title'])[:SLUG_MAX_LENGTH]
+        )
         self.assertEqual(
-            model_to_dict(
-                Note.objects.get(pk=notes_in_db + 1),
-                fields=self.NOTE_DATA.keys()
-            ),
-            self.NOTE_DATA,
-            ''.join(
-                ('Убедитесь, что поля заголовка и текста созданной заметки ',
-                 'совпадают с отправленными в форме.')
-            )
+            created_note.title,
+            self.NOTE_DATA['title'],
+            ('Убедитесь, что заголовок сохраненной заметки '
+             'совпадает с отправленным.')
+        )
+        self.assertEqual(
+            created_note.text,
+            self.NOTE_DATA['text'],
+            ('Убедитесь, что текст сохраненной заметки '
+             'совпадает с отправленным.')
+        )
+        self.assertEqual(
+            created_note.author,
+            self.author,
+            ('Убедитесь, что автор сохраненной заметки '
+             'совпадает с отправителем.')
         )
 
     def test_anonim_cant_create_note(self):
@@ -92,19 +102,17 @@ class TestLogic(TestCase):
         )
         self.assertRedirects(
             anonim_response,
-            reverse('users:login') + '?next=/add/',
-            msg_prefix=''.join(
-                ('Убедитесь, что анонимный пользователь при попытке ',
-                 'создать заметку перенаправляется на страницу авторизации.')
+            reverse('users:login') + f'?next={url}',
+            msg_prefix=(
+                'Убедитесь, что анонимный пользователь при попытке '
+                'создать заметку перенаправляется на страницу авторизации.'
             )
         )
         self.assertEqual(
             Note.objects.count(),
             notes_in_db,
-            ''.join(
-                ('Убедитесь, что отправленная ',
-                 'анонимным пользователем заметка не сохраняется.')
-            )
+            ('Убедитесь, что отправленная '
+             'анонимным пользователем заметка не сохраняется.')
         )
 
     def test_note_has_unique_slug(self):
@@ -119,10 +127,8 @@ class TestLogic(TestCase):
             'form',
             'slug',
             expected_error,
-            ''.join(
-                ('Убедитесь, что при попытке создать пост ',
-                 'с существующим slug, форма возвращается ошибку.')
-            )
+            ('Убедитесь, что при попытке создать пост '
+             'с существующим slug, форма возвращается ошибку.')
         )
         self.assertEqual(
             Note.objects.count(),
@@ -133,66 +139,56 @@ class TestLogic(TestCase):
     def test_create_slug_if_not_stated(self):
         url: str = reverse('notes:add')
         self.author_client.post(url, data=self.NOTE_DATA)
-        result_slug: Note = Note.objects.get(
-            title=self.NOTE_DATA['title']
-        ).slug
         expected_slug: str = slugify(self.NOTE_DATA['title'])[:SLUG_MAX_LENGTH]
         self.assertEqual(
-            result_slug,
-            expected_slug,
-            ''.join(
-                ('Убедитесь, что при создании заметки без указания slug ',
-                 'последний формируется автоматически ',
-                 'при помощи pytils.slugify.')
-            )
+            model_to_dict(
+                Note.objects.get(slug=expected_slug),
+                fields=self.NOTE_DATA.keys()
+            ),
+            self.NOTE_DATA,
+            ('Убедитесь, что при создании заметки без указания slug '
+             'последний формируется автоматически '
+             'при помощи pytils.slugify.')
         )
 
     def test_author_can_edit_note(self):
         url: str = reverse('notes:edit', args=(self.author_note.slug,))
         editing_note_id: int = self.author_note.id
+        note_author: User = self.author_note.author
         response: HttpResponseBase = self.author_client.post(
             url, data=self.NOTE_DATA
         )
         self.assertRedirects(
             response,
             expected_url=reverse('notes:success'),
-            msg_prefix=''.join(
-                ('Убедитесь, что после редактирования заметки ',
-                 'автор перенаправляется на notes:success.')
+            msg_prefix=(
+                'Убедитесь, что после редактирования заметки '
+                'автор перенаправляется на notes:success.'
             )
         )
         updated_note: Note = Note.objects.get(id=editing_note_id)
         self.assertEqual(
             updated_note.title,
             self.NOTE_DATA['title'],
-            ''.join(
-                ('Убедитесь, что заголовок заметки совпадает с тем, ',
-                 'что был отправлен автором.')
-            )
+            ('Убедитесь, что заголовок заметки совпадает с тем, '
+             'что был отправлен автором.')
         )
         self.assertEqual(
             updated_note.text,
             self.NOTE_DATA['text'],
-            ''.join(
-                ('Убедитесь, что текст заметки совпадает с тем, ',
-                 'что был отправлен автором.')
-            )
+            ('Убедитесь, что текст заметки совпадает с тем, '
+             'что был отправлен автором.')
         )
         self.assertEqual(
             updated_note.slug,
             slugify(self.NOTE_DATA['title'])[:SLUG_MAX_LENGTH],
-            ''.join(
-                ('Убедитесь, что slug заметки совпадает с тем, ',
-                 'что должен был быть сгенерирован.')
-            )
+            ('Убедитесь, что slug заметки совпадает с тем, '
+             'что должен был быть сгенерирован.')
         )
         self.assertEqual(
             updated_note.author,
-            self.author,
-            ''.join(
-                ('Убедитесь, что автор заметки совпадает ',
-                 'с отправителем изменений.')
-            )
+            note_author,
+            'Убедитесь, что автор заметки не изменился.'
         )
 
     def test_author_can_delete_note(self):
@@ -204,32 +200,21 @@ class TestLogic(TestCase):
         self.assertRedirects(
             response,
             expected_url=reverse('notes:success'),
-            msg_prefix=''.join(
-                ('Убедитесь, что после удаления заметки ',
-                 'автор перенаправляется на notes:success.')
+            msg_prefix=(
+                'Убедитесь, что после удаления заметки '
+                'автор перенаправляется на notes:success.'
             )
         )
-        self.assertEqual(
+        self.assertFalse(
             Note.objects.filter(pk=deleting_note_id).exists(),
-            False,
-            ''.join(
-                ('Убедитесь, что при запросе автора на notes:delete ',
-                 'заметка действительно удаляется.')
-            )
+            ('Убедитесь, что при запросе автора на notes:delete '
+             'заметка действительно удаляется.')
         )
 
     def test_another_user_cant_edit_note(self):
         url: str = reverse('notes:edit', args=(self.author_note.slug,))
         editing_note_id: int = self.author_note.id
         self.another_user_client.post(url, data=self.NOTE_DATA)
-        self.assertEqual(
-            Note.objects.get(pk=editing_note_id),
-            Note.objects.get(slug=self.author_note.slug),
-            ''.join(
-                ('Убедитесь, что заметка не изменяется ',
-                 'по запросу не автора поста.')
-            )
-        )
         editing_note: Note = Note.objects.get(id=editing_note_id)
         self.assertEqual(
             editing_note.title,
@@ -258,11 +243,8 @@ class TestLogic(TestCase):
             'notes:delete', args=(self.author_note.slug,)
         )
         self.another_user_client.post(deleting_url)
-        self.assertEqual(
+        self.assertTrue(
             Note.objects.filter(pk=deleting_note_id).exists(),
-            True,
-            ''.join(
-                ('Убедитесь, что заметка не удаляется ',
-                 'по запросу не её автора.')
-            )
+            ('Убедитесь, что заметка не удаляется '
+             'по запросу не её автора.')
         )
