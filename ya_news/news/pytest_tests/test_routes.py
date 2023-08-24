@@ -1,5 +1,7 @@
 from http import HTTPStatus
+from typing import Dict, List, Tuple
 
+from django.contrib.auth import get_user
 from django.http.response import HttpResponseBase
 from django.test import Client
 from django.urls import reverse
@@ -12,54 +14,49 @@ from news.models import Comment
 @pytest.mark.usefixtures('news', 'comment')
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    'url, anonim_code, auth_code, author_code',
+    'url, user_statuses_and_codes',
     [
         (reverse('news:home'),
-         HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+         (('аноним', HTTPStatus.OK),)),
         (reverse('users:login'),
-         HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+         (('аноним', HTTPStatus.OK),)),
         (reverse('users:logout'),
-         HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+         (('аноним', HTTPStatus.OK),)),
         (reverse('users:signup'),
-         HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+         (('аноним', HTTPStatus.OK),)),
         (reverse('news:detail', args=(1,)),
-         HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+         (('аноним', HTTPStatus.OK),)),
         (reverse('news:edit', args=(1,)),
-         HTTPStatus.FOUND, HTTPStatus.NOT_FOUND, HTTPStatus.OK),
+         (('аноним', HTTPStatus.FOUND),
+          ('авторизованный', HTTPStatus.NOT_FOUND),
+          ('автор', HTTPStatus.OK))),
         (reverse('news:delete', args=(1,)),
-         HTTPStatus.FOUND, HTTPStatus.NOT_FOUND, HTTPStatus.OK),
+         (('аноним', HTTPStatus.FOUND),
+          ('авторизованный', HTTPStatus.NOT_FOUND),
+          ('автор', HTTPStatus.OK))),
     ],
     ids=['home', 'login', 'logout', 'signup', 'news_detail',
          'news_edit', 'news_delete']
 )
 def test_pages_availability(
     url: str,
-    auth_code: int,
-    author_code: int,
-    anonim_code: int,
-    admin_client: Client,
-    author_client: Client,
+    user_statuses_and_codes: List[Tuple[Tuple[str, int]]],
     anonim_client: Client,
+    admin_client: Client,
+    author_client: Client
 ):
-    anonim_response: HttpResponseBase = anonim_client.get(url)
-    assert anonim_response.status_code == anonim_code, (
-        'Убедитесь, что анонимный пользователь при переходе '
-        f'на {url} получает код ответа {anonim_code}.'
-    )
-    if anonim_code == HTTPStatus.OK:
-        pytest.skip(
-            'Для авторизованных пользователей проверка не требуется.'
+    user_clients: Dict[str, Client] = {
+        'аноним': anonim_client,
+        'авторизованный': admin_client,
+        'автор': author_client,
+    }
+    for user_status, expected_code in user_statuses_and_codes:
+        user_client: Client = user_clients[user_status]
+        response: HttpResponseBase = user_client.get(url)
+        assert response.status_code == expected_code, (
+            f'Убедитесь, что пользователь {get_user(user_client)} '
+            f'имеет доступ к {url}.'
         )
-    auth_response: HttpResponseBase = admin_client.get(url)
-    assert auth_response.status_code == auth_code, (
-        'Убедитесь, что авторизованный пользователь при переходе '
-        f'на {url} получает код ответа {auth_code}.'
-    )
-    author_response: HttpResponseBase = author_client.get(url)
-    assert author_response.status_code == author_code, (
-        'Убедитесь, что пользователь-автор при переходе '
-        f'на {url} получает код ответа {author_code}.'
-    )
 
 
 @pytest.mark.parametrize(

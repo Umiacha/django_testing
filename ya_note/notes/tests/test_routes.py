@@ -1,7 +1,7 @@
 from http import HTTPStatus
 from typing import List, Tuple
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user, get_user_model
 from django.http.response import HttpResponseBase
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -33,65 +33,50 @@ class TestRoutes(TestCase):
         )
 
     def test_pages_availability(self):
-        urls_and_codes: List[Tuple(str, int, int, int)] = [
+        urls_clients_codes: List[Tuple[str, Tuple[Client, int]]] = [
             (reverse('notes:detail', args=(self.note.slug,)),
-             HTTPStatus.FOUND, HTTPStatus.NOT_FOUND, HTTPStatus.OK),
+             (self.anonim_client, HTTPStatus.FOUND),
+             (self.another_user_client, HTTPStatus.NOT_FOUND),
+             (self.author_client, HTTPStatus.OK)),
             (reverse('notes:edit', args=(self.note.slug,)),
-             HTTPStatus.FOUND, HTTPStatus.NOT_FOUND, HTTPStatus.OK),
+             (self.anonim_client, HTTPStatus.FOUND),
+             (self.another_user_client, HTTPStatus.NOT_FOUND),
+             (self.author_client, HTTPStatus.OK)),
             (reverse('notes:delete', args=(self.note.slug,)),
-             HTTPStatus.FOUND, HTTPStatus.NOT_FOUND, HTTPStatus.OK),
+             (self.anonim_client, HTTPStatus.FOUND),
+             (self.another_user_client, HTTPStatus.NOT_FOUND),
+             (self.author_client, HTTPStatus.OK)),
             (reverse('notes:list'),
-             HTTPStatus.FOUND, HTTPStatus.OK, HTTPStatus.OK),
+             (self.anonim_client, HTTPStatus.FOUND),
+             (self.another_user_client, HTTPStatus.OK)),
             (reverse('notes:success'),
-             HTTPStatus.FOUND, HTTPStatus.OK, HTTPStatus.OK),
+             (self.anonim_client, HTTPStatus.FOUND),
+             (self.another_user_client, HTTPStatus.OK)),
             (reverse('notes:add'),
-             HTTPStatus.FOUND, HTTPStatus.OK, HTTPStatus.OK),
+             (self.anonim_client, HTTPStatus.FOUND),
+             (self.another_user_client, HTTPStatus.OK)),
             (reverse('notes:home'),
-             HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+             (self.anonim_client, HTTPStatus.OK)),
             (reverse('users:login'),
-             HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+             (self.anonim_client, HTTPStatus.OK)),
             (reverse('users:signup'),
-             HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+             (self.anonim_client, HTTPStatus.OK)),
             (reverse('users:logout'),
-             HTTPStatus.OK, HTTPStatus.OK, HTTPStatus.OK),
+             (self.anonim_client, HTTPStatus.OK)),
         ]
-        for url, anonim_code, auth_code, author_code in urls_and_codes:
+        for url, *clients_and_codes in urls_clients_codes:
             with self.subTest(
                 url=url,
-                anonim_code=anonim_code,
-                auth_code=auth_code,
-                author_code=author_code
+                clients_and_codes=clients_and_codes
             ):
-                anonim_response: HttpResponseBase = self.anonim_client.get(url)
-                self.assertEqual(
-                    anonim_response.status_code,
-                    anonim_code,
-                    ('Убедитесь, что анонимный пользователь '
-                     f'при переходе на {url} получает '
-                     f'код ответа {anonim_code}')
-                )
-                if anonim_code == HTTPStatus.OK:
-                    continue
-                auth_response: HttpResponseBase = (
-                    self.another_user_client.get(url)
-                )
-                self.assertEqual(
-                    auth_response.status_code,
-                    auth_code,
-                    ('Убедитесь, что авторизованный пользователь '
-                     f'при переходе на {url} получает '
-                     f'код ответа {auth_code}')
-                )
-                if auth_code == HTTPStatus.OK:
-                    continue
-                author_response: HttpResponseBase = self.author_client.get(url)
-                self.assertEqual(
-                    author_response.status_code,
-                    author_code,
-                    ('Убедитесь, что пользователь-автор '
-                     f'при переходе на {url} получает '
-                     f'код ответа {author_code}')
-                )
+                for user_client, expected_code in clients_and_codes:
+                    response: HttpResponseBase = user_client.get(url)
+                    self.assertEqual(
+                        response.status_code,
+                        expected_code,
+                        (f'Убедитесь, что {get_user(user_client)} '
+                         f'имеет доступ к {url}.')
+                    )
 
     def test_anoninum_redirects_from_note_urls(self):
         url_names: List[str] = [

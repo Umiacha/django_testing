@@ -34,19 +34,17 @@ class TestContent(TestCase):
 
     def test_note_in_context(self):
         url: str = reverse('notes:list')
-        for user_agent, user, error_msg, note_assert in [
-            (self.author_client, self.author,
+        for user_agent, error_msg, note_assert in [
+            (self.author_client,
              'Убедитесь, что заметка автора отображается ему на notes:list.',
              self.assertIn),
             (self.another_user_client,
-             self.another_user,
              ('Убедитесь, что заметка другого пользователя '
               'не отображается другим пользователям на notes:list.'),
              self.assertNotIn)
         ]:
             with self.subTest(
                 user_agent=user_agent,
-                user=user,
                 error_msg=error_msg
             ):
                 response: HttpResponseBase = user_agent.get(url)

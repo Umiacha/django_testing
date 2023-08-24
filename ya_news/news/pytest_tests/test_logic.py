@@ -21,16 +21,36 @@ def test_user_can_create_comment(
     author_client: Client,
 ):
     comments_posted: int = Comment.objects.filter(news=news).count()
+    comments_before_post = list(Comment.objects.all())
     url: str = reverse('news:detail', args=(news.id,))
     author_client.post(url, data=comment_form_data)
     assert Comment.objects.count() == comments_posted + 1, (
         'Убедитесь, что авторизованный пользователь '
         'может создать комментарий.'
     )
-    created_comment: Comment = Comment.objects.filter(
-        author=author,
-        news=news
-    ).order_by('created').last()
+    '''
+    Я сомневаюсь, что это оптимальный метод, однако
+    больше уже просто идей нет: в этом методе я разве
+    что привлекаю поле id, ОДНАКО эти id уже принадлежат
+    "существующим" в БД записям, а потому заняты быть не могут.
+    Если id не подойдет (вдруг id записей переназначаются
+    при добавлении), можно использовать slug (он ведь
+    тоже уникальный).
+
+    Суть: в comments_before_post я получаю QuerySet
+    всех Comment, существующих в базе ДО поста пользователя,
+    и перевожу его в список (иначе из-за "ленивости"
+    QuerySet мой запрос в БД будет отправлен уже после запроса пользователя).
+    В created_comment я делаю новый запрос к БД,
+    исключая из него все записи comments_before_post по id.
+
+    Вообще говоря, можно избежать использования полей
+    записей и filter, используя метод difference(),
+    однако SQLite его не поддерживает.
+    '''
+    created_comment: News = Comment.objects.exclude(
+        id__in=[prev.id for prev in comments_before_post]
+    ).get()
     assert created_comment.id == comments_posted + 1, (
         'Убедитесь, что id комментария формируется правильно.'
     )
@@ -107,7 +127,7 @@ def test_author_can_delete_comment(
             'автор перенаправляется в раздел комментариев поста.'
         )
     )
-    assert comment not in Comment.objects.all(), (
+    assert not Comment.objects.filter(id=comment.id).exists(), (
         'Убедитесь, что комментарий удаляется при отправке '
         'авторизованным пользователем соответствующего запроса.'
     )
@@ -163,7 +183,7 @@ def test_another_user_cant_delete_comment(
         'Убедитесь, что при попытке обновить комментарий '
         'другой пользователь получает ошибку 404.'
     )
-    assert comment in Comment.objects.all(), (
+    assert Comment.objects.filter(id=comment.id).exists(), (
         'Убедитесь, что комментарий не удаляется '
         'по запросу не автора комментария.'
     )

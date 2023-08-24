@@ -56,6 +56,7 @@ class TestLogic(TestCase):
     def test_auth_user_can_create_note(self):
         url: str = reverse('notes:add')
         notes_in_db: int = Note.objects.count()
+        notes_before_post = list(Note.objects.all())
         author_response: HttpResponseBase = self.author_client.post(
             url, data=self.NOTE_DATA
         )
@@ -72,9 +73,15 @@ class TestLogic(TestCase):
             notes_in_db + 1,
             'Убедитесь, что созданная пользователем заметка сохраняется.'
         )
-        created_note: Note = Note.objects.get(
-            slug=slugify(self.NOTE_DATA['title'])[:SLUG_MAX_LENGTH]
-        )
+        '''
+        Если требуется, объяснение этого способа получения заметки
+        есть в аналогичном получении записи из БД
+        в test_user_can_create_comment из
+        ya_news/news/pytest_tests/test_logic.py
+        '''
+        created_note: Note = Note.objects.exclude(
+            id__in=[note.id for note in notes_before_post]
+        ).get()
         self.assertEqual(
             created_note.title,
             self.NOTE_DATA['title'],
@@ -138,8 +145,11 @@ class TestLogic(TestCase):
 
     def test_create_slug_if_not_stated(self):
         url: str = reverse('notes:add')
+        notes_before_post = list(Note.objects.all())
         self.author_client.post(url, data=self.NOTE_DATA)
-        expected_slug: str = slugify(self.NOTE_DATA['title'])[:SLUG_MAX_LENGTH]
+        expected_slug: str = Note.objects.exclude(
+            id__in=[note.id for note in notes_before_post]
+        ).get().slug
         self.assertEqual(
             model_to_dict(
                 Note.objects.get(slug=expected_slug),
@@ -153,8 +163,6 @@ class TestLogic(TestCase):
 
     def test_author_can_edit_note(self):
         url: str = reverse('notes:edit', args=(self.author_note.slug,))
-        editing_note_id: int = self.author_note.id
-        note_author: User = self.author_note.author
         response: HttpResponseBase = self.author_client.post(
             url, data=self.NOTE_DATA
         )
@@ -166,7 +174,7 @@ class TestLogic(TestCase):
                 'автор перенаправляется на notes:success.'
             )
         )
-        updated_note: Note = Note.objects.get(id=editing_note_id)
+        updated_note: Note = Note.objects.get(id=self.author_note.id)
         self.assertEqual(
             updated_note.title,
             self.NOTE_DATA['title'],
@@ -187,7 +195,7 @@ class TestLogic(TestCase):
         )
         self.assertEqual(
             updated_note.author,
-            note_author,
+            self.author_note.author,
             'Убедитесь, что автор заметки не изменился.'
         )
 
@@ -213,9 +221,8 @@ class TestLogic(TestCase):
 
     def test_another_user_cant_edit_note(self):
         url: str = reverse('notes:edit', args=(self.author_note.slug,))
-        editing_note_id: int = self.author_note.id
         self.another_user_client.post(url, data=self.NOTE_DATA)
-        editing_note: Note = Note.objects.get(id=editing_note_id)
+        editing_note: Note = Note.objects.get(id=self.author_note.id)
         self.assertEqual(
             editing_note.title,
             self.author_note.title,
