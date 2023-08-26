@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 from django.contrib.auth import get_user
 from django.http.response import HttpResponseBase
@@ -8,29 +8,29 @@ from django.urls import reverse
 import pytest
 from pytest_django.asserts import assertRedirects
 
-from news.models import Comment
+from news.models import Comment, News
 
 
 @pytest.mark.usefixtures('news', 'comment')
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    'url, user_statuses_and_codes',
+    'url_name, url_obj, user_statuses_and_codes',
     [
-        (reverse('news:home'),
+        ('news:home', None,
          (('аноним', HTTPStatus.OK),)),
-        (reverse('users:login'),
+        ('users:login', None,
          (('аноним', HTTPStatus.OK),)),
-        (reverse('users:logout'),
+        ('users:logout', None,
          (('аноним', HTTPStatus.OK),)),
-        (reverse('users:signup'),
+        ('users:signup', None,
          (('аноним', HTTPStatus.OK),)),
-        (reverse('news:detail', args=(1,)),
+        ('news:detail', pytest.lazy_fixture('news'),
          (('аноним', HTTPStatus.OK),)),
-        (reverse('news:edit', args=(1,)),
+        ('news:edit', pytest.lazy_fixture('news'),
          (('аноним', HTTPStatus.FOUND),
           ('авторизованный', HTTPStatus.NOT_FOUND),
           ('автор', HTTPStatus.OK))),
-        (reverse('news:delete', args=(1,)),
+        ('news:delete', pytest.lazy_fixture('news'),
          (('аноним', HTTPStatus.FOUND),
           ('авторизованный', HTTPStatus.NOT_FOUND),
           ('автор', HTTPStatus.OK))),
@@ -39,7 +39,8 @@ from news.models import Comment
          'news_edit', 'news_delete']
 )
 def test_pages_availability(
-    url: str,
+    url_name: str,
+    url_obj: Union[News, None],
     user_statuses_and_codes: List[Tuple[Tuple[str, int]]],
     anonim_client: Client,
     admin_client: Client,
@@ -50,6 +51,18 @@ def test_pages_availability(
         'авторизованный': admin_client,
         'автор': author_client,
     }
+    '''
+    Я бы передавал news.id напрямую в reverse в mark.parametrize,
+    однако pytest умеет обрабатывать фикстуры переданные только
+    как самостоятельные параметры (то есть, не в составе коллекций
+    или аргументов функций).
+    Также сложность заключается в том, что reverse принимает либо
+    None, либо Sequence, а фикстуры в parametrize могут передаваться только
+    как самостоятельные объекты. Поэтому в url_args мне приходится
+    проводить дополнительную обработку параметров для URL.
+    '''
+    url_args: Union[int, None] = (url_obj.id,) if url_obj else None
+    url = reverse(url_name, args=url_args)
     for user_status, expected_code in user_statuses_and_codes:
         user_client: Client = user_clients[user_status]
         response: HttpResponseBase = user_client.get(url)

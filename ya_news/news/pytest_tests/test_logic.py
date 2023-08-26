@@ -21,7 +21,9 @@ def test_user_can_create_comment(
     author_client: Client,
 ):
     comments_posted: int = Comment.objects.filter(news=news).count()
-    comments_before_post = list(Comment.objects.all())
+    comments_before_post_ids = set(
+        Comment.objects.all().values_list('id', flat=True)
+    )
     url: str = reverse('news:detail', args=(news.id,))
     author_client.post(url, data=comment_form_data)
     assert Comment.objects.count() == comments_posted + 1, (
@@ -29,28 +31,28 @@ def test_user_can_create_comment(
         'может создать комментарий.'
     )
     '''
-    Я сомневаюсь, что это оптимальный метод, однако
-    больше уже просто идей нет: в этом методе я разве
-    что привлекаю поле id, ОДНАКО эти id уже принадлежат
-    "существующим" в БД записям, а потому заняты быть не могут.
-    Если id не подойдет (вдруг id записей переназначаются
-    при добавлении), можно использовать slug (он ведь
-    тоже уникальный).
+    Спасибо за предложенные варианты!
 
-    Суть: в comments_before_post я получаю QuerySet
-    всех Comment, существующих в базе ДО поста пользователя,
-    и перевожу его в список (иначе из-за "ленивости"
-    QuerySet мой запрос в БД будет отправлен уже после запроса пользователя).
-    В created_comment я делаю новый запрос к БД,
-    исключая из него все записи comments_before_post по id.
+    Я выбираю первый из предложенных вами вариантов,
+    так как (с предположением, что записей в БД много)
+    собирать два множества с запросом в БД, а затем искать
+    разность мне кажется более длительным,
+    нежели создание множества и лишь один запрос в БД.
 
-    Вообще говоря, можно избежать использования полей
-    записей и filter, используя метод difference(),
-    однако SQLite его не поддерживает.
+    Я так понимаю, что в общем случае скорость того или
+    иного способа зависит от архитектуры БД (и, может,
+    используемой хеш-функции для множеств), но у нас
+    все записи индексируются по id, по которому мы их и исключаем.
+    Поэтому запрос должен работать достаточно быстро.
     '''
-    created_comment: News = Comment.objects.exclude(
-        id__in=[prev.id for prev in comments_before_post]
-    ).get()
+    created_comments = Comment.objects.exclude(
+        id__in=comments_before_post_ids
+    )
+    assert len(created_comments) == 1, (
+        'Убедитесь, что при запросе пользователя '
+        'создается лишь один комментарий.'
+    )
+    created_comment: Comment = created_comments.get()
     assert created_comment.id == comments_posted + 1, (
         'Убедитесь, что id комментария формируется правильно.'
     )

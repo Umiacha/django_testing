@@ -56,7 +56,9 @@ class TestLogic(TestCase):
     def test_auth_user_can_create_note(self):
         url: str = reverse('notes:add')
         notes_in_db: int = Note.objects.count()
-        notes_before_post = list(Note.objects.all())
+        notes_before_post_ids = set(
+            Note.objects.all().values_list('id', flat=True)
+        )
         author_response: HttpResponseBase = self.author_client.post(
             url, data=self.NOTE_DATA
         )
@@ -73,15 +75,14 @@ class TestLogic(TestCase):
             notes_in_db + 1,
             'Убедитесь, что созданная пользователем заметка сохраняется.'
         )
-        '''
-        Если требуется, объяснение этого способа получения заметки
-        есть в аналогичном получении записи из БД
-        в test_user_can_create_comment из
-        ya_news/news/pytest_tests/test_logic.py
-        '''
-        created_note: Note = Note.objects.exclude(
-            id__in=[note.id for note in notes_before_post]
-        ).get()
+        created_notes: Note = Note.objects.exclude(
+            id__in=notes_before_post_ids
+        )
+        assert len(created_notes) == 1, (
+            'Убедитесь, что при запросе пользователя '
+            'создается лишь одна заметка.'
+        )
+        created_note: Note = created_notes.get()
         self.assertEqual(
             created_note.title,
             self.NOTE_DATA['title'],
@@ -145,11 +146,18 @@ class TestLogic(TestCase):
 
     def test_create_slug_if_not_stated(self):
         url: str = reverse('notes:add')
-        notes_before_post = list(Note.objects.all())
+        notes_before_post_ids = set(
+            Note.objects.all().values_list('id', flat=True)
+        )
         self.author_client.post(url, data=self.NOTE_DATA)
-        expected_slug: str = Note.objects.exclude(
-            id__in=[note.id for note in notes_before_post]
-        ).get().slug
+        created_note = Note.objects.exclude(
+            id__in=notes_before_post_ids
+        )
+        assert len(created_note) == 1, (
+            'Убедитесь, что при запросе пользователя '
+            'создается лишь одна заметка.'
+        )
+        expected_slug: str = created_note.get().slug
         self.assertEqual(
             model_to_dict(
                 Note.objects.get(slug=expected_slug),

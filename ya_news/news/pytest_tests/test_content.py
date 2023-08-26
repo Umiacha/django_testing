@@ -62,46 +62,30 @@ def test_comments_sorting(anonim_client: Client, news: News):
     )
 
 
-@pytest.mark.parametrize(
-    'user_agent, expected_result, msg_additions',
-    [
-        (pytest.lazy_fixture('anonim_client'), False, ['', '']),
-        (pytest.lazy_fixture('author_client'), True, ['не ', 'не'])
-    ],
-    ids=['anonim_user', 'authorized_user']
-)
-def test_page_contains_comment_form(
+def test_page_contains_comment_form_for_auth_user(
     news: News,
-    user_agent: Client,
-    expected_result: bool,
-    msg_additions: List[str],
+    author_client: Client,
 ):
     url: str = reverse('news:detail', args=(news.id,))
-    response: HttpResponseBase = user_agent.get(url)
+    response: HttpResponseBase = author_client.get(url)
     context = response.context
-    '''
-    Сравнение нужно для anonim_client (ведь без сравнение с expected_result
-    будет падать ошибка). А переносить сравнение
-    с expected_result в проверку наличия формы
-    (то бишь, ('form' in context) == expected_result) нельзя,
-    иначе anonim_client в проверке будет доходить до isinstance.
-
-    В таком случае я вижу только два варианта:
-    1) разделить проверки наличия и класса формы на два assert;
-    2) оставить только проверку класса формы,
-    отлавливая KeyError (для anonim_client) через try-except.
-
-    С точки зрения производительности я не вижу разницы
-    между этими случаями, однако
-    в соответствии с best practices (use exceptions for exceptional
-    cases) я реализую первый вариант.
-    '''
-    assert ('form' in context) == expected_result, (
+    assert (
+        'form' in context
+        and isinstance(context['form'], CommentForm)
+    ), (
         'Убедитесь, что форма для создания комментария '
-        '{} отображается {}авторизованному пользователю'
-        .format(*msg_additions)
+        'отображается авторизованному пользователю'
     )
-    if expected_result:
-        assert isinstance(context['form'], CommentForm), (
-            'Убедитесь, что форма комментария это объект класса CommentForm.'
-        )
+
+
+def test_page_not_contain_comment_form_for_anonim(
+    news: News,
+    anonim_client: Client,
+):
+    url: str = reverse('news:detail', args=(news.id,))
+    response: HttpResponseBase = anonim_client.get(url)
+    context = response.context
+    assert 'form' not in context, (
+        'Убедитесь, что форма для создания комментария '
+        'не отображается неавторизованному пользователю'
+    )
