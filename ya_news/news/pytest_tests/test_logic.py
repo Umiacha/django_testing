@@ -20,42 +20,19 @@ def test_user_can_create_comment(
     comment_form_data: Dict[str, str],
     author_client: Client,
 ):
-    comments_posted: int = Comment.objects.filter(news=news).count()
     comments_before_post_ids = set(
-        Comment.objects.all().values_list('id', flat=True)
+        Comment.objects.values_list('id', flat=True)
     )
     url: str = reverse('news:detail', args=(news.id,))
     author_client.post(url, data=comment_form_data)
-    assert Comment.objects.count() == comments_posted + 1, (
+    created_comments = list(
+        Comment.objects.exclude(id__in=comments_before_post_ids)
+    )
+    assert Comment.objects.count() == len(comments_before_post_ids) + 1, (
         'Убедитесь, что авторизованный пользователь '
-        'может создать комментарий.'
+        'может создать комментарий. И создается только 1.'
     )
-    '''
-    Спасибо за предложенные варианты!
-
-    Я выбираю первый из предложенных вами вариантов,
-    так как (с предположением, что записей в БД много)
-    собирать два множества с запросом в БД, а затем искать
-    разность мне кажется более длительным,
-    нежели создание множества и лишь один запрос в БД.
-
-    Я так понимаю, что в общем случае скорость того или
-    иного способа зависит от архитектуры БД (и, может,
-    используемой хеш-функции для множеств), но у нас
-    все записи индексируются по id, по которому мы их и исключаем.
-    Поэтому запрос должен работать достаточно быстро.
-    '''
-    created_comments = Comment.objects.exclude(
-        id__in=comments_before_post_ids
-    )
-    assert len(created_comments) == 1, (
-        'Убедитесь, что при запросе пользователя '
-        'создается лишь один комментарий.'
-    )
-    created_comment: Comment = created_comments.get()
-    assert created_comment.id == comments_posted + 1, (
-        'Убедитесь, что id комментария формируется правильно.'
-    )
+    created_comment: Comment = created_comments[-1]
     assert created_comment.text == comment_form_data['text'], (
         'Убедитесь, что текст комментария формируется правильно.'
     )
@@ -72,7 +49,7 @@ def test_anonim_cant_create_comment(
     comment_form_data: Dict[str, str],
     anonim_client: Client,
 ):
-    comments_posted: int = Comment.objects.filter(news=news).count()
+    comments_posted: int = Comment.objects.count()
     url: str = reverse('news:detail', args=(news.id,))
     anonim_client.post(url, data=comment_form_data)
     assert Comment.objects.count() == comments_posted, (

@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 from django.contrib.auth import get_user_model
 from django.forms.models import model_to_dict
@@ -55,9 +55,8 @@ class TestLogic(TestCase):
 
     def test_auth_user_can_create_note(self):
         url: str = reverse('notes:add')
-        notes_in_db: int = Note.objects.count()
         notes_before_post_ids = set(
-            Note.objects.all().values_list('id', flat=True)
+            Note.objects.values_list('id', flat=True)
         )
         author_response: HttpResponseBase = self.author_client.post(
             url, data=self.NOTE_DATA
@@ -70,19 +69,23 @@ class TestLogic(TestCase):
                 'автор перенаправляется на notes:success.'
             )
         )
+        '''
+        Эта проверка осуществляет две функции:
+        1) Проверяет, что заметка пользователя сохраняется.
+        2) Проверяет, что сохраняется лишь одна заметка.
+        Это гарантирует нам, что created_notes (см. ниже)
+        содержит лишь одну запись и к ней можно применять метод get
+        или обращение по индексу '-1'.
+        '''
         self.assertEqual(
             Note.objects.count(),
-            notes_in_db + 1,
+            len(notes_before_post_ids) + 1,
             'Убедитесь, что созданная пользователем заметка сохраняется.'
         )
-        created_notes: Note = Note.objects.exclude(
-            id__in=notes_before_post_ids
+        created_notes: List[Note] = list(
+            Note.objects.exclude(id__in=notes_before_post_ids)
         )
-        assert len(created_notes) == 1, (
-            'Убедитесь, что при запросе пользователя '
-            'создается лишь одна заметка.'
-        )
-        created_note: Note = created_notes.get()
+        created_note: Note = created_notes[-1]
         self.assertEqual(
             created_note.title,
             self.NOTE_DATA['title'],
@@ -150,14 +153,15 @@ class TestLogic(TestCase):
             Note.objects.all().values_list('id', flat=True)
         )
         self.author_client.post(url, data=self.NOTE_DATA)
-        created_note = Note.objects.exclude(
-            id__in=notes_before_post_ids
+        created_note = list(
+            Note.objects.exclude(id__in=notes_before_post_ids)
         )
-        assert len(created_note) == 1, (
-            'Убедитесь, что при запросе пользователя '
-            'создается лишь одна заметка.'
+        self.assertTrue(
+            len(created_note) == 1,
+            ('Убедитесь, что при запросе пользователя '
+             'создается лишь одна заметка.')
         )
-        expected_slug: str = created_note.get().slug
+        expected_slug: str = created_note[-1].slug
         self.assertEqual(
             model_to_dict(
                 Note.objects.get(slug=expected_slug),
@@ -210,7 +214,7 @@ class TestLogic(TestCase):
     def test_author_can_delete_note(self):
         deleting_note_id: int = self.author_note.id
         url: str = reverse(
-            'notes:delete', args=(Note.objects.get(pk=deleting_note_id).slug,)
+            'notes:delete', args=(self.author_note.slug,)
         )
         response: HttpResponseBase = self.author_client.post(url)
         self.assertRedirects(
