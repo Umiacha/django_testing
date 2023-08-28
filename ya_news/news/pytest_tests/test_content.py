@@ -54,7 +54,7 @@ def test_comments_sorting(anonim_client: Client, news: News):
     # Get QuerySet and transform it to List for comparing.
     comments_list: List[News] = response.context['news'].comment_set.all()[::1]
     sorted_comments: List[Comment] = sorted(
-        comments_list, key=lambda x: x.created
+        comments_list, key=lambda comment_obj: comment_obj.created
     )
     assert comments_list == sorted_comments, (
         'Убедитесь, что комментарии на странице новости '

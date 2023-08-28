@@ -69,14 +69,6 @@ class TestLogic(TestCase):
                 'автор перенаправляется на notes:success.'
             )
         )
-        '''
-        Эта проверка осуществляет две функции:
-        1) Проверяет, что заметка пользователя сохраняется.
-        2) Проверяет, что сохраняется лишь одна заметка.
-        Это гарантирует нам, что created_notes (см. ниже)
-        содержит лишь одну запись и к ней можно применять метод get
-        или обращение по индексу '-1'.
-        '''
         self.assertEqual(
             Note.objects.count(),
             len(notes_before_post_ids) + 1,
@@ -161,10 +153,9 @@ class TestLogic(TestCase):
             ('Убедитесь, что при запросе пользователя '
              'создается лишь одна заметка.')
         )
-        expected_slug: str = created_note[-1].slug
         self.assertEqual(
             model_to_dict(
-                Note.objects.get(slug=expected_slug),
+                created_note[-1],
                 fields=self.NOTE_DATA.keys()
             ),
             self.NOTE_DATA,

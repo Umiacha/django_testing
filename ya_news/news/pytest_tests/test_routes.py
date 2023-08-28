@@ -51,16 +51,6 @@ def test_pages_availability(
         'авторизованный': admin_client,
         'автор': author_client,
     }
-    '''
-    Я бы передавал news.id напрямую в reverse в mark.parametrize,
-    однако pytest умеет обрабатывать фикстуры переданные только
-    как самостоятельные параметры (то есть, не в составе коллекций
-    или аргументов функций).
-    Также сложность заключается в том, что reverse принимает либо
-    None, либо Sequence, а фикстуры в parametrize могут передаваться только
-    как самостоятельные объекты. Поэтому в url_args мне приходится
-    проводить дополнительную обработку параметров для URL.
-    '''
     url_args: Union[int, None] = (url_obj.id,) if url_obj else None
     url = reverse(url_name, args=url_args)
     for user_status, expected_code in user_statuses_and_codes:

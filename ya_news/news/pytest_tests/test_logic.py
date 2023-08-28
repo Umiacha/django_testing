@@ -154,7 +154,6 @@ def test_another_user_cant_delete_comment(
     comment: Comment,
     comment_form_data: Dict[str, str],
     admin_client: Client,
-    news: News,
 ):
     url: str = reverse('news:delete', args=(comment.id,))
     response: HttpResponseBase = admin_client.post(url, data=comment_form_data)
